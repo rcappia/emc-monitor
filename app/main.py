@@ -53,6 +53,7 @@ def migrar_colunas_banco():
     """
     with engine.connect() as conn:
         # ── Colunas novas em clientes ──
+        _adicionar_coluna(conn, "clientes", "termo_busca", "VARCHAR(300) DEFAULT ''")
         _adicionar_coluna(conn, "clientes", "responsavel", "VARCHAR(200) DEFAULT ''")
         _adicionar_coluna(conn, "clientes", "email", "VARCHAR(200) DEFAULT ''")
         _adicionar_coluna(conn, "clientes", "celular", "VARCHAR(30) DEFAULT ''")
