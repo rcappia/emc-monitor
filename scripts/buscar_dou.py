@@ -259,6 +259,19 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
 
 # ── E-mail ────────────────────────────────────────────────────────────────────
 
+def _formatar_paragrafo(texto: str) -> str:
+    """Separa visualmente o trecho do DOU com quebras antes de elementos estruturais."""
+    if not texto:
+        return "(texto não disponível)"
+    for palavra in ["RESOLVE", "CONSIDERANDO", "DETERMINA", "AUTORIZA", "RATIFICA", "HOMOLOGA", "TORNA PÚBLICO"]:
+        texto = re.sub(rf'(?<=[.;,])\s+({palavra})', rf'<br><br>\1', texto)
+    texto = re.sub(r'\s+(Art\.\s*\d)',         r'<br><br>\1', texto)
+    texto = re.sub(r'\s+(§\s*\d)',             r'<br>\1',     texto)
+    texto = re.sub(r'\s+([IVX]+\s*[-–]\s)',    r'<br>\1',     texto)
+    texto = re.sub(r'\s+(Parágrafo\s+único)',   r'<br><br>\1', texto, flags=re.IGNORECASE)
+    return texto.strip()
+
+
 def enviar_email(alertas: list[dict]) -> bool:
     hoje = date.today().strftime("%d/%m/%Y")
     qtd = len(alertas)
@@ -270,26 +283,38 @@ def enviar_email(alertas: list[dict]) -> bool:
     linhas_txt = [f"EMC Monitor — Alertas DOU {hoje}", f"Total: {qtd} publicação(ões)", "=" * 60]
 
     for i, a in enumerate(alertas, 1):
-        processo_html = ""
+        # Badge tipo
         if a.get("tipo") == "processo":
-            processo_html = f'<tr><td style="color:#6b7280;font-size:13px;width:140px;">Nº Processo</td><td style="font-weight:600;font-family:monospace;">{a.get("termo_busca","")}</td></tr>'
-        elif a.get("processo_dou"):
-            processo_html = f'<tr><td style="color:#6b7280;font-size:13px;width:140px;">Processo no DOU</td><td style="font-weight:600;font-family:monospace;">{a.get("processo_dou","")}</td></tr>'
+            badge = '<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">PROCESSO</span>'
+        else:
+            badge = '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">NOME</span>'
 
-        link_btn = f'<a href="{a["url"]}" style="display:inline-block;margin-top:10px;background:#003087;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:13px;">Ver no DOU</a>' if a.get("url") else ""
+        # Linha de processo
+        if a.get("tipo") == "processo":
+            linha_processo = f'<tr><td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Nº do Processo</td><td style="padding:5px 0;font-weight:600;font-family:monospace;font-size:13px;">{a.get("termo_busca","")}</td></tr>'
+        elif a.get("processo_dou"):
+            linha_processo = f'<tr><td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Processo no DOU</td><td style="padding:5px 0;font-weight:600;font-family:monospace;font-size:13px;">{a.get("processo_dou","")}</td></tr>'
+        else:
+            linha_processo = ""
+
+        trecho_html = _formatar_paragrafo(a.get("paragrafo") or a.get("resumo") or "")
+        link_btn = f'<a href="{a["url"]}" style="display:inline-block;margin-top:12px;background:#16a34a;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">Ver publicação no DOU ↗</a>' if a.get("url") else ""
 
         blocos_html += f"""
-        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:20px;">
-          <div style="font-size:18px;font-weight:700;color:#111827;margin-bottom:14px;">{a["nome_cliente"]}</div>
-          <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
-            {processo_html}
-            <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;width:140px;">Seção do DOU</td><td style="padding:4px 0;">{a["secao"]}</td></tr>
-            <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;">Data</td><td style="padding:4px 0;">{a.get("data_publicacao", hoje)}</td></tr>
-            <tr><td style="padding:4px 0;color:#6b7280;font-size:13px;vertical-align:top;">Assunto</td><td style="padding:4px 0;font-weight:600;">{a["titulo"]}</td></tr>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
+            {badge}
+            <span style="font-size:17px;font-weight:700;color:#0f172a;">{a["nome_cliente"]}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+            {linha_processo}
+            <tr><td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Seção do DOU</td><td style="padding:5px 0;font-size:13px;color:#374151;">{a["secao"]}</td></tr>
+            <tr><td style="padding:5px 0;color:#6b7280;font-size:12px;">Data de publicação</td><td style="padding:5px 0;font-size:13px;color:#374151;">{a.get("data_publicacao", hoje)}</td></tr>
+            <tr><td style="padding:5px 0;color:#6b7280;font-size:12px;vertical-align:top;">Assunto</td><td style="padding:5px 0;font-size:13px;font-weight:600;color:#0f172a;">{a["titulo"]}</td></tr>
           </table>
-          <div style="background:#f9fafb;border-left:4px solid #003087;padding:12px 16px;border-radius:0 6px 6px 0;">
-            <div style="font-size:11px;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Trecho onde aparece</div>
-            <div style="font-size:14px;color:#374151;line-height:1.6;">{a.get("paragrafo","")}</div>
+          <div style="background:#f8fafc;border-left:4px solid #16a34a;padding:12px 16px;border-radius:0 8px 8px 0;">
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Trecho onde aparece</div>
+            <div style="font-size:13.5px;color:#374151;line-height:1.7;">{trecho_html}</div>
           </div>
           {link_btn}
         </div>"""
@@ -307,14 +332,29 @@ def enviar_email(alertas: list[dict]) -> bool:
             linhas_txt.append(f"    Link: {a['url']}")
         linhas_txt.append("-" * 60)
 
-    html = f"""<html><body style="font-family:Arial,sans-serif;background:#f4f6f9;margin:0;padding:20px;">
-      <div style="max-width:680px;margin:auto;">
-        <div style="background:#003087;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0;">
-          <div style="font-size:20px;font-weight:700;">📡 EMC Monitor — Alerta DOU</div>
-          <div style="opacity:0.75;font-size:13px;margin-top:4px;">{qtd} publicação{'ões' if qtd>1 else ''} encontrada{'s' if qtd>1 else ''} em {hoje}</div>
+    html = f"""<html>
+    <body style="font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;margin:0;padding:24px 16px;">
+      <div style="max-width:660px;margin:auto;">
+        <div style="background:#0f172a;border-radius:10px 10px 0 0;padding:0;">
+          <div style="background:#16a34a;height:4px;border-radius:10px 10px 0 0;"></div>
+          <div style="padding:22px 28px 20px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:22px;">📡</span>
+              <div>
+                <div style="color:#fff;font-size:18px;font-weight:700;line-height:1.2;">EMC Monitor</div>
+                <div style="color:rgba(255,255,255,.55);font-size:12px;margin-top:2px;">Alerta do Diário Oficial da União</div>
+              </div>
+            </div>
+            <div style="margin-top:14px;background:rgba(255,255,255,.06);border-radius:6px;padding:10px 14px;display:inline-block;">
+              <span style="color:#4ade80;font-weight:600;font-size:14px;">{qtd} publicação{'ões' if qtd>1 else ''}</span>
+              <span style="color:rgba(255,255,255,.6);font-size:13px;">&nbsp;encontrada{'s' if qtd>1 else ''} em {hoje}</span>
+            </div>
+          </div>
         </div>
-        <div style="background:#f4f6f9;padding:20px 0;">{blocos_html}</div>
-        <div style="text-align:center;font-size:11px;color:#9ca3af;padding:10px 0 20px;">Enviado automaticamente pelo EMC Monitor às 6h00.</div>
+        <div style="background:#f1f5f9;padding:20px 0;">{blocos_html}</div>
+        <div style="text-align:center;padding:8px 0 24px;">
+          <div style="font-size:11px;color:#94a3b8;">Enviado automaticamente pelo EMC Monitor · Busca diária às 6h00</div>
+        </div>
       </div>
     </body></html>"""
 

@@ -1,4 +1,5 @@
-"""Envio de e-mail via SMTP Outlook / Microsoft 365."""
+"""Envio de e-mail via Gmail SMTP."""
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,21 +15,6 @@ def enviar_alertas_dou(
     destinatarios: list[str],
     alertas: list[dict],
 ) -> bool:
-    """
-    Envia e-mail com os alertas do DOU.
-
-    Cada alerta deve ter:
-      - nome_cliente: nome do cliente
-      - tipo: "nome" ou "processo"
-      - termo_busca: o termo que foi buscado (nome ou nº processo)
-      - secao: seção do DOU onde apareceu
-      - titulo: título da publicação
-      - paragrafo: trecho completo onde o cliente/processo apareceu
-      - url: link para a publicação original
-      - data_publicacao: data da publicação
-
-    Returns True se enviado com sucesso.
-    """
     if not alertas:
         return True
 
@@ -39,16 +25,16 @@ def enviar_alertas_dou(
 
     assunto = f"[EMC Monitor] Alerta DOU {hoje} — {qtd} publicação{'ões' if qtd > 1 else ''}: {nomes_resumo}"
 
-    html = _montar_html(alertas, hoje)
+    html  = _montar_html(alertas, hoje)
     texto = _montar_texto(alertas, hoje)
 
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = assunto
-        msg["From"] = remetente
-        msg["To"] = ", ".join(destinatarios)
-        msg.attach(MIMEText(texto, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
+        msg["From"]    = remetente
+        msg["To"]      = ", ".join(destinatarios)
+        msg.attach(MIMEText(texto, "plain",  "utf-8"))
+        msg.attach(MIMEText(html,  "html",   "utf-8"))
 
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.ehlo()
@@ -62,18 +48,53 @@ def enviar_alertas_dou(
         return False
 
 
+# ─── Formatação do trecho do DOU ──────────────────────────────────────────────
+
+def _formatar_paragrafo(texto: str) -> str:
+    """
+    Separa visualmente o trecho do DOU no e-mail HTML.
+    Insere quebras antes de elementos estruturais comuns em atos oficiais.
+    """
+    if not texto:
+        return "(texto não disponível)"
+
+    # Quebra dupla antes de palavras-chave que iniciam novos blocos
+    for palavra in [
+        "RESOLVE", "CONSIDERANDO", "DETERMINA", "AUTORIZA",
+        "RATIFICA", "HOMOLOGA", "TORNA PÚBLICO",
+    ]:
+        texto = re.sub(
+            rf'(?<=[.;,])\s+({palavra})',
+            rf'<br><br>\1',
+            texto,
+        )
+
+    # Quebra dupla antes de artigos: Art. 1º, Art. 2º ...
+    texto = re.sub(r'\s+(Art\.\s*\d)', r'<br><br>\1', texto)
+
+    # Quebra simples antes de parágrafos: § 1º, § 2º ...
+    texto = re.sub(r'\s+(§\s*\d)', r'<br>\1', texto)
+
+    # Quebra simples antes de alíneas romanas: I -, II -, III -, IV - ...
+    texto = re.sub(r'\s+([IVX]+\s*[-–]\s)', r'<br>\1', texto)
+
+    # Quebra antes de "Parágrafo único"
+    texto = re.sub(r'\s+(Parágrafo\s+único)', r'<br><br>\1', texto, flags=re.IGNORECASE)
+
+    return texto.strip()
+
+
+# ─── Corpo texto simples ───────────────────────────────────────────────────────
+
 def _montar_texto(alertas: list[dict], hoje: str) -> str:
-    """Versão texto simples do e-mail (para quem não suporta HTML)."""
     linhas = [
-        f"EMC Monitor — Alertas do Diário Oficial da União",
+        "EMC Monitor — Alertas do Diário Oficial da União",
         f"Data: {hoje}",
         f"Total de publicações encontradas: {len(alertas)}",
         "=" * 60,
     ]
     for i, a in enumerate(alertas, 1):
-        linhas += [
-            f"\n[{i}] CLIENTE: {a.get('nome_cliente', '')}",
-        ]
+        linhas += [f"\n[{i}] CLIENTE: {a.get('nome_cliente', '')}"]
         if a.get("tipo") == "processo":
             linhas.append(f"    Nº PROCESSO: {a.get('termo_busca', '')}")
         elif a.get("processo_dou"):
@@ -88,90 +109,142 @@ def _montar_texto(alertas: list[dict], hoje: str) -> str:
         if a.get("url"):
             linhas.append(f"    LINK: {a.get('url')}")
         linhas.append("-" * 60)
-    linhas.append("\nAcesse o sistema para ver todos os detalhes.")
+    linhas.append("\nAcesse o painel EMC Monitor para ver todos os detalhes.")
     return "\n".join(linhas)
 
 
+# ─── Corpo HTML ───────────────────────────────────────────────────────────────
+
 def _montar_html(alertas: list[dict], hoje: str) -> str:
-    """Versão HTML formatada do e-mail."""
     blocos = ""
     for a in alertas:
-        tipo_badge = (
-            f'<span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">Processo</span>'
-            if a.get("tipo") == "processo"
-            else f'<span style="background:#3b82f6;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">Nome</span>'
-        )
 
-        numero_processo = ""
+        # Badge tipo
         if a.get("tipo") == "processo":
-            numero_processo = f"""
+            badge = '<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">PROCESSO</span>'
+        else:
+            badge = '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">NOME</span>'
+
+        # Linha de processo
+        if a.get("tipo") == "processo":
+            linha_processo = f"""
             <tr>
-              <td style="padding:4px 0;color:#6b7280;font-size:13px;width:140px;">Nº do Processo</td>
-              <td style="padding:4px 0;font-weight:600;font-family:monospace;">{a.get('termo_busca','')}</td>
+              <td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Nº do Processo</td>
+              <td style="padding:5px 0;font-weight:600;font-family:monospace;font-size:13px;">{a.get('termo_busca','')}</td>
             </tr>"""
         elif a.get("processo_dou"):
-            numero_processo = f"""
+            linha_processo = f"""
             <tr>
-              <td style="padding:4px 0;color:#6b7280;font-size:13px;width:140px;">Processo no DOU</td>
-              <td style="padding:4px 0;font-weight:600;font-family:monospace;">{a.get('processo_dou','')}</td>
+              <td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Processo no DOU</td>
+              <td style="padding:5px 0;font-weight:600;font-family:monospace;font-size:13px;">{a.get('processo_dou','')}</td>
             </tr>"""
+        else:
+            linha_processo = ""
 
-        paragrafo = a.get("paragrafo") or a.get("resumo") or "(texto não disponível)"
-        url = a.get("url", "")
-        link_btn = f'<a href="{url}" style="display:inline-block;margin-top:10px;background:#003087;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:13px;">Ver publicação no DOU</a>' if url else ""
+        # Trecho formatado com quebras de parágrafo
+        trecho_html = _formatar_paragrafo(
+            a.get("paragrafo") or a.get("resumo") or ""
+        )
+
+        # Botão link
+        if a.get("url"):
+            link_btn = f'''<a href="{a['url']}"
+              style="display:inline-block;margin-top:12px;background:#16a34a;color:#fff;
+                     padding:8px 18px;border-radius:6px;text-decoration:none;
+                     font-size:13px;font-weight:600;">
+              Ver publicação no DOU ↗
+            </a>'''
+        else:
+            link_btn = ""
 
         blocos += f"""
-        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-            {tipo_badge}
-            <span style="font-size:18px;font-weight:700;color:#111827;">{a.get('nome_cliente','')}</span>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;
+                    padding:22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);">
+
+          <!-- Cabeçalho do card -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;
+                      padding-bottom:14px;border-bottom:1px solid #f1f5f9;">
+            {badge}
+            <span style="font-size:17px;font-weight:700;color:#0f172a;">
+              {a.get('nome_cliente','')}
+            </span>
           </div>
-          <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
-            {numero_processo}
+
+          <!-- Informações -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+            {linha_processo}
             <tr>
-              <td style="padding:4px 0;color:#6b7280;font-size:13px;width:140px;">Seção do DOU</td>
-              <td style="padding:4px 0;">{a.get('secao','')}</td>
+              <td style="padding:5px 0;color:#6b7280;font-size:12px;width:150px;">Seção do DOU</td>
+              <td style="padding:5px 0;font-size:13px;color:#374151;">{a.get('secao','')}</td>
             </tr>
             <tr>
-              <td style="padding:4px 0;color:#6b7280;font-size:13px;">Data</td>
-              <td style="padding:4px 0;">{a.get('data_publicacao', hoje)}</td>
+              <td style="padding:5px 0;color:#6b7280;font-size:12px;">Data de publicação</td>
+              <td style="padding:5px 0;font-size:13px;color:#374151;">{a.get('data_publicacao', hoje)}</td>
             </tr>
             <tr>
-              <td style="padding:4px 0;color:#6b7280;font-size:13px;vertical-align:top;">Assunto</td>
-              <td style="padding:4px 0;font-weight:600;">{a.get('titulo','')}</td>
+              <td style="padding:5px 0;color:#6b7280;font-size:12px;vertical-align:top;">Assunto</td>
+              <td style="padding:5px 0;font-size:13px;font-weight:600;color:#0f172a;">{a.get('titulo','')}</td>
             </tr>
           </table>
 
-          <div style="background:#f9fafb;border-left:4px solid #003087;padding:12px 16px;border-radius:0 6px 6px 0;">
-            <div style="font-size:11px;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Trecho onde aparece</div>
-            <div style="font-size:14px;color:#374151;line-height:1.6;">{paragrafo}</div>
+          <!-- Trecho do DOU -->
+          <div style="background:#f8fafc;border-left:4px solid #16a34a;
+                      padding:12px 16px;border-radius:0 8px 8px 0;">
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;
+                        text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">
+              Trecho onde aparece
+            </div>
+            <div style="font-size:13.5px;color:#374151;line-height:1.7;">
+              {trecho_html}
+            </div>
           </div>
+
           {link_btn}
         </div>
         """
 
     return f"""
     <html>
-    <body style="font-family:Arial,sans-serif;background:#f4f6f9;margin:0;padding:20px;">
-      <div style="max-width:680px;margin:auto;">
+    <body style="font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;margin:0;padding:24px 16px;">
+      <div style="max-width:660px;margin:auto;">
 
         <!-- Cabeçalho -->
-        <div style="background:#003087;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0;">
-          <div style="font-size:20px;font-weight:700;">📡 EMC Monitor — Alerta DOU</div>
-          <div style="opacity:0.75;font-size:13px;margin-top:4px;">
-            {len(alertas)} publicação{'ões' if len(alertas)>1 else ''} encontrada{'s' if len(alertas)>1 else ''} em {hoje}
+        <div style="background:#0f172a;border-radius:10px 10px 0 0;padding:0;">
+          <div style="background:#16a34a;height:4px;border-radius:10px 10px 0 0;"></div>
+          <div style="padding:22px 28px 20px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:22px;">📡</span>
+              <div>
+                <div style="color:#fff;font-size:18px;font-weight:700;line-height:1.2;">EMC Monitor</div>
+                <div style="color:rgba(255,255,255,.55);font-size:12px;margin-top:2px;">
+                  Alerta do Diário Oficial da União
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:14px;background:rgba(255,255,255,.06);border-radius:6px;
+                        padding:10px 14px;display:inline-block;">
+              <span style="color:#4ade80;font-weight:600;font-size:14px;">
+                {len(alertas)} publicação{'ões' if len(alertas)>1 else ''}
+              </span>
+              <span style="color:rgba(255,255,255,.6);font-size:13px;">
+                &nbsp;encontrada{'s' if len(alertas)>1 else ''} em {hoje}
+              </span>
+            </div>
           </div>
         </div>
 
-        <!-- Corpo -->
-        <div style="background:#f4f6f9;padding:20px 0;">
+        <!-- Cards de alertas -->
+        <div style="background:#f1f5f9;padding:20px 0;">
           {blocos}
         </div>
 
         <!-- Rodapé -->
-        <div style="text-align:center;font-size:11px;color:#9ca3af;padding:10px 0 20px;">
-          Enviado automaticamente pelo EMC Monitor às 6h00 de hoje.
+        <div style="text-align:center;padding:8px 0 24px;">
+          <div style="font-size:11px;color:#94a3b8;">
+            Enviado automaticamente pelo EMC Monitor · Busca diária às 6h00
+          </div>
         </div>
+
       </div>
     </body>
     </html>
