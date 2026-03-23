@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from datetime import date
 from app.database import get_db
-from app.models import Monitorado, AlertaDOU, Configuracao
+from app.models import Monitorado, AlertaDOU, Configuracao, BuscaLog
 from app.services import dou_api, email_sender
 from app.services.auth import get_usuario_atual
 
@@ -36,17 +36,10 @@ def listar(request: Request, filtro: str = "", db: Session = Depends(get_db)):
 @router.get("/historico-buscas", response_class=HTMLResponse)
 def historico_buscas(request: Request, db: Session = Depends(get_db)):
     """Mostra todos os dias e horários em que buscas foram realizadas."""
-    from sqlalchemy import func, distinct, cast, Date
-
-    # Busca todas as datas/horas distintas de encontrado_em (agrupadas por minuto)
     registros = (
-        db.query(
-            func.date_trunc('minute', AlertaDOU.encontrado_em).label('momento'),
-            func.count(AlertaDOU.id).label('total_encontrados'),
-        )
-        .filter(AlertaDOU.encontrado_em != None)
-        .group_by(func.date_trunc('minute', AlertaDOU.encontrado_em))
-        .order_by(func.date_trunc('minute', AlertaDOU.encontrado_em).desc())
+        db.query(BuscaLog)
+        .order_by(BuscaLog.realizada_em.desc())
+        .limit(100)
         .all()
     )
 
@@ -64,49 +57,81 @@ def buscar_agora(background_tasks: BackgroundTasks, db: Session = Depends(get_db
     return RedirectResponse(url="/alertas/?msg=busca_iniciada", status_code=303)
 
 
-def _executar_busca(db: Session):
+def _executar_busca(db: Session, tipo: str = "manual"):
     """Lógica de busca executada em background."""
+    from datetime import datetime
+
     monitorados = db.query(Monitorado).filter(Monitorado.ativo == True).all()
     novos_alertas = []
 
     hoje = date.today().strftime("%d-%m-%Y")
 
-    for mon in monitorados:
-        resultados = dou_api.buscar_no_dou(mon.termo_busca, hoje, hoje)
-        for res in resultados:
-            # Evita duplicatas para o mesmo dia
-            existe = (
-                db.query(AlertaDOU)
-                .filter(
-                    AlertaDOU.monitorado_id == mon.id,
-                    AlertaDOU.data_publicacao == res["data_publicacao"],
-                    AlertaDOU.titulo == res["titulo"][:500],
+    try:
+        for mon in monitorados:
+            resultados = dou_api.buscar_no_dou(mon.termo_busca, hoje, hoje)
+            for res in resultados:
+                # Evita duplicatas para o mesmo dia
+                existe = (
+                    db.query(AlertaDOU)
+                    .filter(
+                        AlertaDOU.monitorado_id == mon.id,
+                        AlertaDOU.data_publicacao == res["data_publicacao"],
+                        AlertaDOU.titulo == res["titulo"][:500],
+                    )
+                    .first()
                 )
-                .first()
+                if not existe:
+                    alerta = AlertaDOU(
+                        monitorado_id=mon.id,
+                        data_publicacao=res["data_publicacao"],
+                        secao=res["secao"],
+                        titulo=res["titulo"][:500],
+                        resumo=res.get("resumo", "")[:500],
+                        paragrafo=res.get("paragrafo", ""),
+                        url=res.get("url", ""),
+                    )
+                    db.add(alerta)
+                    novos_alertas.append({
+                        **res,
+                        "nome_cliente": mon.nome_cliente,
+                        "tipo": mon.tipo,
+                        "termo_busca": mon.termo_busca,
+                    })
+
+        db.commit()
+
+        # Registra busca no log
+        log = BuscaLog(
+            tipo=tipo,
+            origem="web",
+            total_encontrados=len(novos_alertas),
+            sucesso=True,
+            observacao=f"Busca concluída. {len(novos_alertas)} nova(s) publicação(ões).",
+            realizada_em=datetime.utcnow(),
+        )
+        db.add(log)
+        db.commit()
+
+        # Envia e-mail se houver novidades
+        if novos_alertas:
+            _enviar_email_alertas(db, novos_alertas)
+
+    except Exception as e:
+        # Registra falha no log
+        try:
+            log = BuscaLog(
+                tipo=tipo,
+                origem="web",
+                total_encontrados=0,
+                sucesso=False,
+                observacao=f"Erro: {str(e)[:500]}",
+                realizada_em=datetime.utcnow(),
             )
-            if not existe:
-                alerta = AlertaDOU(
-                    monitorado_id=mon.id,
-                    data_publicacao=res["data_publicacao"],
-                    secao=res["secao"],
-                    titulo=res["titulo"][:500],
-                    resumo=res.get("resumo", "")[:500],
-                    paragrafo=res.get("paragrafo", ""),
-                    url=res.get("url", ""),
-                )
-                db.add(alerta)
-                novos_alertas.append({
-                    **res,
-                    "nome_cliente": mon.nome_cliente,
-                    "tipo": mon.tipo,
-                    "termo_busca": mon.termo_busca,
-                })
-
-    db.commit()
-
-    # Envia e-mail se houver novidades
-    if novos_alertas:
-        _enviar_email_alertas(db, novos_alertas)
+            db.add(log)
+            db.commit()
+        except Exception:
+            pass
+        raise
 
 
 def _enviar_email_alertas(db: Session, alertas: list[dict]):

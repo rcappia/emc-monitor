@@ -59,6 +59,19 @@ class AlertaDOU(Base):
     cliente: Mapped["Cliente"] = relationship(back_populates="alertas")
 
 
+class BuscaLog(Base):
+    """Registro de cada busca realizada no DOU (automática ou manual)."""
+    __tablename__ = "busca_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tipo: Mapped[str] = mapped_column(String(30), default="manual")  # "automatica" ou "manual"
+    origem: Mapped[str] = mapped_column(String(30), default="web")   # "web" ou "github_actions"
+    total_encontrados: Mapped[int] = mapped_column(Integer, default=0)
+    sucesso: Mapped[bool] = mapped_column(Boolean, default=True)
+    observacao: Mapped[str] = mapped_column(Text, nullable=True, default="")
+    realizada_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 # ── Tabela legada (mantida para não perder dados) ─────────────────────────────
 
 class Monitorado(Base):

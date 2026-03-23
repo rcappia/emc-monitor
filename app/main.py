@@ -14,7 +14,7 @@ from datetime import date, datetime
 from sqlalchemy import text
 
 from app.database import init_db, SessionLocal, engine
-from app.models import AlertaDOU, Monitorado, Cliente, ProcessoCliente
+from app.models import AlertaDOU, Monitorado, Cliente, ProcessoCliente, BuscaLog
 from app.routers import monitorados, alertas, configuracoes, clientes
 from app.routers.alertas import _executar_busca
 from app.routers import auth_router
@@ -26,7 +26,7 @@ def tarefa_diaria():
     print(f"[{datetime.now().strftime('%d/%m/%Y %H:%M')}] Iniciando busca diária no DOU...")
     db: Session = SessionLocal()
     try:
-        _executar_busca(db)
+        _executar_busca(db, tipo="automatica")
         print(f"[{datetime.now().strftime('%H:%M')}] Busca diária concluída.")
     finally:
         db.close()
@@ -235,8 +235,14 @@ def dashboard(request: Request):
             .limit(10)
             .all()
         )
-        ultimo = db.query(AlertaDOU).order_by(AlertaDOU.encontrado_em.desc()).first()
-        ultima_busca = ultimo.encontrado_em.strftime("%d/%m %H:%M") if ultimo else None
+        # Última busca registrada no log (mais confiável)
+        ultimo_log = db.query(BuscaLog).order_by(BuscaLog.realizada_em.desc()).first()
+        if ultimo_log:
+            ultima_busca = ultimo_log.realizada_em.strftime("%d/%m %H:%M")
+        else:
+            # Fallback: pega do último alerta encontrado
+            ultimo = db.query(AlertaDOU).order_by(AlertaDOU.encontrado_em.desc()).first()
+            ultima_busca = ultimo.encontrado_em.strftime("%d/%m %H:%M") if ultimo else None
 
         return templates.TemplateResponse("dashboard.html", {
             "request": request,

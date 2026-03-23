@@ -41,8 +41,10 @@
           <tr>
             <th class="ps-4">Data</th>
             <th>Horário</th>
+            <th>Tipo</th>
             <th>Publicações encontradas</th>
-            <th class="text-end pe-4">Ação</th>
+            <th>Status</th>
+            <th class="pe-4">Observação</th>
           </tr>
         </thead>
         <tbody>
@@ -50,11 +52,26 @@
           <tr>
             <td class="ps-4">
               <i class="bi bi-calendar3 me-1" style="color:var(--clr-accent);"></i>
-              {{ r.momento.strftime('%d/%m/%Y') }}
+              {{ r.realizada_em.strftime('%d/%m/%Y') }}
             </td>
             <td>
               <i class="bi bi-clock me-1" style="color:var(--clr-muted);"></i>
-              {{ r.momento.strftime('%H:%M') }}
+              {{ r.realizada_em.strftime('%H:%M') }}
+            </td>
+            <td>
+              {% if r.tipo == 'automatica' %}
+              <span class="badge" style="background:#dbeafe;color:#1d4ed8;">
+                <i class="bi bi-robot me-1"></i>Automática
+              </span>
+              {% elif r.origem == 'github_actions' %}
+              <span class="badge" style="background:#f3e8ff;color:#7c3aed;">
+                <i class="bi bi-github me-1"></i>GitHub Actions
+              </span>
+              {% else %}
+              <span class="badge" style="background:#fef9c3;color:#b45309;">
+                <i class="bi bi-hand-index me-1"></i>Manual
+              </span>
+              {% endif %}
             </td>
             <td>
               {% if r.total_encontrados > 0 %}
@@ -65,10 +82,19 @@
               <span class="text-muted" style="font-size:13px;">Nenhuma</span>
               {% endif %}
             </td>
-            <td class="text-end pe-4">
-              <a href="/alertas/?filtro=hoje" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-eye me-1"></i>Ver
-              </a>
+            <td>
+              {% if r.sucesso %}
+              <span class="badge" style="background:#dcfce7;color:#16a34a;">
+                <i class="bi bi-check-circle me-1"></i>Sucesso
+              </span>
+              {% else %}
+              <span class="badge" style="background:#fee2e2;color:#dc2626;">
+                <i class="bi bi-x-circle me-1"></i>Erro
+              </span>
+              {% endif %}
+            </td>
+            <td class="pe-4" style="font-size:12.5px;color:var(--clr-muted);max-width:250px;">
+              {{ r.observacao[:100] if r.observacao else '—' }}{% if r.observacao and r.observacao|length > 100 %}...{% endif %}
             </td>
           </tr>
           {% endfor %}

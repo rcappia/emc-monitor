@@ -413,6 +413,27 @@ def enviar_email(alertas: list[dict]) -> bool:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _registrar_busca_log(total_encontrados: int, sucesso: bool, observacao: str):
+    """Registra a busca no banco de dados para o histórico."""
+    if not DATABASE_URL:
+        return
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO busca_log (tipo, origem, total_encontrados, sucesso, observacao, realizada_em)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            ("automatica", "github_actions", total_encontrados, sucesso, observacao, datetime.utcnow()),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"Log de busca registrado no banco.")
+    except Exception as exc:
+        print(f"[AVISO] Falha ao registrar log de busca: {exc}")
+
+
 if __name__ == "__main__":
     hoje = date.today()
     print(f"EMC Monitor — Busca DOU {hoje.strftime('%d/%m/%Y')}")
@@ -424,12 +445,20 @@ if __name__ == "__main__":
     cookie = session.cookies.get("inlabs_session_cookie", "")
     print(f"Login INLABS: {'OK' if cookie else 'FALHOU'}")
     if not cookie:
+        _registrar_busca_log(0, False, "Falha no login INLABS")
         exit(1)
 
     print(f"\nBuscando {len(CLIENTES)} clientes no DOU...")
     alertas = buscar_hoje(session)
 
     print(f"\nTotal encontrado: {len(alertas)} publicação(ões)")
+
+    # Registra a busca no histórico
+    _registrar_busca_log(
+        total_encontrados=len(alertas),
+        sucesso=True,
+        observacao=f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
+    )
 
     if alertas:
         print("Enviando e-mail...")
