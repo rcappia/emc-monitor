@@ -14,11 +14,74 @@
 </div>
 
 {% if clientes %}
-<div class="row g-3">
+
+<!-- Barra de pesquisa, filtros e ordenação -->
+<div class="card border-0 mb-3">
+  <div class="card-body p-3">
+    <div class="row g-2 align-items-center">
+
+      <!-- Campo de pesquisa -->
+      <div class="col-12 col-md-5">
+        <div class="position-relative">
+          <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--clr-muted);font-size:14px;"></i>
+          <input type="text" id="busca-cliente" class="form-control" placeholder="Pesquisar por nome, responsável, e-mail ou processo..."
+            style="padding-left:36px;font-size:13.5px;" autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Filtro de status -->
+      <div class="col-6 col-md-2">
+        <select id="filtro-status" class="form-select" style="font-size:13.5px;">
+          <option value="todos">Todos</option>
+          <option value="ativo">Ativos</option>
+          <option value="inativo">Inativos</option>
+        </select>
+      </div>
+
+      <!-- Filtro por alertas -->
+      <div class="col-6 col-md-2">
+        <select id="filtro-alertas" class="form-select" style="font-size:13.5px;">
+          <option value="todos">Todos</option>
+          <option value="com-alertas">Com alertas</option>
+          <option value="sem-alertas">Sem alertas</option>
+        </select>
+      </div>
+
+      <!-- Ordenação -->
+      <div class="col-8 col-md-2">
+        <select id="ordenar-por" class="form-select" style="font-size:13.5px;">
+          <option value="nome-az">Nome A→Z</option>
+          <option value="nome-za">Nome Z→A</option>
+          <option value="mais-alertas">Mais alertas</option>
+          <option value="menos-alertas">Menos alertas</option>
+          <option value="mais-recente">Mais recente</option>
+          <option value="mais-antigo">Mais antigo</option>
+        </select>
+      </div>
+
+      <!-- Contador de resultados -->
+      <div class="col-4 col-md-1 text-end">
+        <span id="contador-resultados" class="badge bg-secondary" style="font-size:12px;"></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Grid de clientes -->
+<div class="row g-3" id="grid-clientes">
   {% for c in clientes %}
-  <div class="col-sm-6 col-xl-4">
+  <div class="col-sm-6 col-xl-4 cliente-card"
+    data-nome="{{ c.razao_social|lower }}"
+    data-responsavel="{{ (c.responsavel or '')|lower }}"
+    data-email="{{ (c.email or '')|lower }}"
+    data-celular="{{ (c.celular or '')|lower }}"
+    data-processos="{% for p in c.processos %}{{ p.numero_processo|lower }} {% endfor %}"
+    data-status="{{ 'ativo' if c.ativo else 'inativo' }}"
+    data-alertas="{{ c.alertas|length }}"
+    data-criado="{{ c.criado_em.strftime('%Y%m%d%H%M') if c.criado_em else '0' }}">
     <a href="/clientes/{{ c.id }}" class="text-decoration-none">
-      <div class="card border-0 h-100" style="cursor:pointer;">
+      <div class="card border-0 h-100" style="cursor:pointer;transition:transform .15s,box-shadow .15s;">
         <div class="card-body p-4">
 
           <div class="d-flex justify-content-between align-items-start mb-2">
@@ -69,6 +132,126 @@
   </div>
   {% endfor %}
 </div>
+
+<!-- Mensagem "Nenhum resultado" -->
+<div id="sem-resultados" class="card border-0 mt-3" style="display:none;">
+  <div class="empty-state">
+    <i class="bi bi-search"></i>
+    <p>Nenhum cliente encontrado com esses filtros.<br>
+    <span style="font-size:12.5px;">Tente mudar a pesquisa ou os filtros.</span></p>
+  </div>
+</div>
+
+<!-- Script de pesquisa, filtro e ordenação -->
+<script>
+(function () {
+  var busca = document.getElementById('busca-cliente');
+  var filtroStatus = document.getElementById('filtro-status');
+  var filtroAlertas = document.getElementById('filtro-alertas');
+  var ordenarPor = document.getElementById('ordenar-por');
+  var grid = document.getElementById('grid-clientes');
+  var contador = document.getElementById('contador-resultados');
+  var semResultados = document.getElementById('sem-resultados');
+  var cards = Array.from(document.querySelectorAll('.cliente-card'));
+
+  function normalizar(texto) {
+    return (texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function aplicarFiltros() {
+    var termo = normalizar(busca.value);
+    var status = filtroStatus.value;
+    var alertas = filtroAlertas.value;
+    var visiveis = 0;
+
+    cards.forEach(function (card) {
+      var nome = normalizar(card.dataset.nome);
+      var resp = normalizar(card.dataset.responsavel);
+      var email = normalizar(card.dataset.email);
+      var cel = normalizar(card.dataset.celular);
+      var procs = normalizar(card.dataset.processos);
+      var cardStatus = card.dataset.status;
+      var cardAlertas = parseInt(card.dataset.alertas) || 0;
+
+      // Pesquisa por texto
+      var matchTexto = !termo ||
+        nome.indexOf(termo) !== -1 ||
+        resp.indexOf(termo) !== -1 ||
+        email.indexOf(termo) !== -1 ||
+        cel.indexOf(termo) !== -1 ||
+        procs.indexOf(termo) !== -1;
+
+      // Filtro de status
+      var matchStatus = status === 'todos' || cardStatus === status;
+
+      // Filtro de alertas
+      var matchAlertas = alertas === 'todos' ||
+        (alertas === 'com-alertas' && cardAlertas > 0) ||
+        (alertas === 'sem-alertas' && cardAlertas === 0);
+
+      if (matchTexto && matchStatus && matchAlertas) {
+        card.style.display = '';
+        visiveis++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    contador.textContent = visiveis + ' de ' + cards.length;
+    semResultados.style.display = visiveis === 0 ? '' : 'none';
+  }
+
+  function aplicarOrdenacao() {
+    var criterio = ordenarPor.value;
+
+    cards.sort(function (a, b) {
+      switch (criterio) {
+        case 'nome-az':
+          return a.dataset.nome.localeCompare(b.dataset.nome, 'pt-BR');
+        case 'nome-za':
+          return b.dataset.nome.localeCompare(a.dataset.nome, 'pt-BR');
+        case 'mais-alertas':
+          return (parseInt(b.dataset.alertas) || 0) - (parseInt(a.dataset.alertas) || 0);
+        case 'menos-alertas':
+          return (parseInt(a.dataset.alertas) || 0) - (parseInt(b.dataset.alertas) || 0);
+        case 'mais-recente':
+          return (b.dataset.criado || '0').localeCompare(a.dataset.criado || '0');
+        case 'mais-antigo':
+          return (a.dataset.criado || '0').localeCompare(b.dataset.criado || '0');
+        default:
+          return 0;
+      }
+    });
+
+    // Reinsere os cards na ordem correta
+    cards.forEach(function (card) {
+      grid.appendChild(card);
+    });
+  }
+
+  function atualizar() {
+    aplicarOrdenacao();
+    aplicarFiltros();
+  }
+
+  // Event listeners
+  busca.addEventListener('input', aplicarFiltros);
+  filtroStatus.addEventListener('change', atualizar);
+  filtroAlertas.addEventListener('change', atualizar);
+  ordenarPor.addEventListener('change', atualizar);
+
+  // Atalho: ESC limpa a pesquisa
+  busca.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      busca.value = '';
+      aplicarFiltros();
+    }
+  });
+
+  // Inicializa o contador
+  atualizar();
+})();
+</script>
 
 {% else %}
 <div class="card border-0">
