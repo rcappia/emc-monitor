@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 
 from app.database import init_db, SessionLocal
-from app.models import AlertaDOU, Monitorado
+from app.models import AlertaDOU, Monitorado, Cliente
 from app.routers import monitorados, alertas, configuracoes, clientes
 from app.routers.alertas import _executar_busca
 from app.routers import auth_router
@@ -30,6 +30,41 @@ def tarefa_diaria():
         db.close()
 
 
+def migrar_monitorados_para_clientes(db: Session):
+    """
+    Migração automática: cria registros na tabela 'clientes' para cada
+    monitorado existente que ainda não tem cliente_id vinculado.
+    Agrupa por nome_cliente para não criar duplicatas.
+    """
+    orfaos = db.query(Monitorado).filter(Monitorado.cliente_id == None).all()
+    if not orfaos:
+        return
+
+    # Agrupa por nome_cliente
+    grupos: dict[str, list[Monitorado]] = {}
+    for m in orfaos:
+        chave = m.nome_cliente.strip()
+        grupos.setdefault(chave, []).append(m)
+
+    criados = 0
+    for razao, monitorados_grupo in grupos.items():
+        # Verifica se já existe um cliente com essa razão social
+        cliente = db.query(Cliente).filter(Cliente.razao_social == razao).first()
+        if not cliente:
+            cliente = Cliente(razao_social=razao)
+            db.add(cliente)
+            db.flush()  # gera o id
+            criados += 1
+
+        # Vincula todos os monitorados deste grupo ao cliente
+        for m in monitorados_grupo:
+            m.cliente_id = cliente.id
+
+    db.commit()
+    if criados:
+        print(f"Migração: {criados} cliente(s) criado(s) a partir de monitorados existentes.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Inicializa banco de dados e usuários padrão
@@ -37,6 +72,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         criar_usuarios_iniciais(db)
+        migrar_monitorados_para_clientes(db)
     finally:
         db.close()
 
