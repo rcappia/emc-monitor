@@ -13,17 +13,46 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
-def listar(request: Request, db: Session = Depends(get_db)):
-    alertas = (
-        db.query(AlertaDOU)
-        .options(joinedload(AlertaDOU.cliente))
-        .order_by(AlertaDOU.encontrado_em.desc())
-        .limit(100)
-        .all()
-    )
+def listar(request: Request, filtro: str = "", db: Session = Depends(get_db)):
+    query = db.query(AlertaDOU).options(joinedload(AlertaDOU.cliente))
+
+    titulo_filtro = "Todas as publicações"
+    if filtro == "hoje":
+        hoje = date.today().strftime("%Y-%m-%d")
+        query = query.filter(AlertaDOU.data_publicacao == hoje)
+        titulo_filtro = "Publicações de hoje"
+
+    alertas = query.order_by(AlertaDOU.encontrado_em.desc()).limit(200).all()
+
     return templates.TemplateResponse("alertas.html", {
         "request": request,
         "alertas": alertas,
+        "titulo_filtro": titulo_filtro,
+        "filtro_ativo": filtro,
+        "usuario_atual": get_usuario_atual(request),
+    })
+
+
+@router.get("/historico-buscas", response_class=HTMLResponse)
+def historico_buscas(request: Request, db: Session = Depends(get_db)):
+    """Mostra todos os dias e horários em que buscas foram realizadas."""
+    from sqlalchemy import func, distinct, cast, Date
+
+    # Busca todas as datas/horas distintas de encontrado_em (agrupadas por minuto)
+    registros = (
+        db.query(
+            func.date_trunc('minute', AlertaDOU.encontrado_em).label('momento'),
+            func.count(AlertaDOU.id).label('total_encontrados'),
+        )
+        .filter(AlertaDOU.encontrado_em != None)
+        .group_by(func.date_trunc('minute', AlertaDOU.encontrado_em))
+        .order_by(func.date_trunc('minute', AlertaDOU.encontrado_em).desc())
+        .all()
+    )
+
+    return templates.TemplateResponse("historico_buscas.html", {
+        "request": request,
+        "registros": registros,
         "usuario_atual": get_usuario_atual(request),
     })
 

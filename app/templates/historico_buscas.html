@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Histórico de buscas — EMC Monitor{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Histórico de buscas</h1>
+    <p class="page-subtitle">Todos os dias e horários em que o sistema buscou no DOU</p>
+  </div>
+  <a href="/" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Dashboard
+  </a>
+</div>
+
+<!-- Filtros rápidos -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="/alertas/" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-list me-1"></i>Todas publicações
+  </a>
+  <a href="/alertas/?filtro=hoje" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-calendar-event me-1"></i>Publicações de hoje
+  </a>
+  <a href="/alertas/historico-buscas" class="btn btn-sm btn-primary">
+    <i class="bi bi-clock-history me-1"></i>Histórico de buscas
+  </a>
+</div>
+
+<div class="card border-0">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history"></i>
+    Buscas realizadas
+    <span class="badge bg-secondary ms-1">{{ registros|length }}</span>
+  </div>
+  <div class="card-body p-0">
+
+    {% if registros %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4">Data</th>
+            <th>Horário</th>
+            <th>Publicações encontradas</th>
+            <th class="text-end pe-4">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in registros %}
+          <tr>
+            <td class="ps-4">
+              <i class="bi bi-calendar3 me-1" style="color:var(--clr-accent);"></i>
+              {{ r.momento.strftime('%d/%m/%Y') }}
+            </td>
+            <td>
+              <i class="bi bi-clock me-1" style="color:var(--clr-muted);"></i>
+              {{ r.momento.strftime('%H:%M') }}
+            </td>
+            <td>
+              {% if r.total_encontrados > 0 %}
+              <span class="badge" style="background:var(--clr-accent-lt);color:var(--clr-accent);">
+                {{ r.total_encontrados }} publicação{{ 'ões' if r.total_encontrados > 1 else '' }}
+              </span>
+              {% else %}
+              <span class="text-muted" style="font-size:13px;">Nenhuma</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <a href="/alertas/?filtro=hoje" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>Ver
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-clock-history"></i>
+      <p>Nenhuma busca realizada ainda.<br>
+      <span style="font-size:12.5px;">As buscas automáticas são feitas de segunda a sexta às 6h, ou clique em <strong>Buscar agora</strong> na página de alertas.</span></p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<div class="alert alert-info mt-3" style="font-size:12.5px;">
+  <i class="bi bi-info-circle me-1"></i>
+  O sistema busca automaticamente no Diário Oficial de <strong>segunda a sexta às 6h</strong>.
+  Você também pode disparar buscas manuais pela página de <a href="/alertas/">alertas</a>.
+</div>
+
+{% endblock %}

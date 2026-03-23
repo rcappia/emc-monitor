@@ -16,61 +16,69 @@
   </form>
 </div>
 
-<!-- Cards de resumo -->
+<!-- Cards de resumo (clicáveis) -->
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
-    <div class="card border-0">
-      <div class="metric-card">
-        <div class="metric-icon green">
-          <i class="bi bi-people-fill"></i>
-        </div>
-        <div>
-          <div class="metric-value">{{ total_monitorados }}</div>
-          <div class="metric-label">Clientes monitorados</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-xl-3">
-    <div class="card border-0">
-      <div class="metric-card">
-        <div class="metric-icon yellow">
-          <i class="bi bi-bell-fill"></i>
-        </div>
-        <div>
-          <div class="metric-value">{{ total_alertas_hoje }}</div>
-          <div class="metric-label">Publicações hoje</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-xl-3">
-    <div class="card border-0">
-      <div class="metric-card">
-        <div class="metric-icon blue">
-          <i class="bi bi-newspaper"></i>
-        </div>
-        <div>
-          <div class="metric-value">{{ total_alertas }}</div>
-          <div class="metric-label">Total de publicações</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-xl-3">
-    <div class="card border-0">
-      <div class="metric-card">
-        <div class="metric-icon slate">
-          <i class="bi bi-clock-history"></i>
-        </div>
-        <div>
-          <div class="metric-value" style="font-size:14px;margin-bottom:4px;">
-            {{ ultima_busca or "—" }}
+    <a href="/clientes/" class="metric-card-link">
+      <div class="card border-0">
+        <div class="metric-card">
+          <div class="metric-icon green">
+            <i class="bi bi-people-fill"></i>
           </div>
-          <div class="metric-label">Última busca automática</div>
+          <div>
+            <div class="metric-value">{{ total_monitorados }}</div>
+            <div class="metric-label">Clientes monitorados</div>
+          </div>
         </div>
       </div>
-    </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="/alertas/?filtro=hoje" class="metric-card-link">
+      <div class="card border-0">
+        <div class="metric-card">
+          <div class="metric-icon yellow">
+            <i class="bi bi-bell-fill"></i>
+          </div>
+          <div>
+            <div class="metric-value">{{ total_alertas_hoje }}</div>
+            <div class="metric-label">Publicações hoje</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="/alertas/" class="metric-card-link">
+      <div class="card border-0">
+        <div class="metric-card">
+          <div class="metric-icon blue">
+            <i class="bi bi-newspaper"></i>
+          </div>
+          <div>
+            <div class="metric-value">{{ total_alertas }}</div>
+            <div class="metric-label">Total de publicações</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <a href="/alertas/historico-buscas" class="metric-card-link">
+      <div class="card border-0">
+        <div class="metric-card">
+          <div class="metric-icon slate">
+            <i class="bi bi-clock-history"></i>
+          </div>
+          <div>
+            <div class="metric-value" style="font-size:14px;margin-bottom:4px;">
+              {{ ultima_busca or "—" }}
+            </div>
+            <div class="metric-label">Última busca automática</div>
+          </div>
+        </div>
+      </div>
+    </a>
   </div>
 </div>
 

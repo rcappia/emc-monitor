@@ -6,9 +6,9 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Alertas do DOU</h1>
-    <p class="page-subtitle">Publicações encontradas no Diário Oficial da União</p>
+    <p class="page-subtitle">{{ titulo_filtro|default('Publicações encontradas no Diário Oficial da União') }}</p>
   </div>
-  <div class="d-flex align-items-center gap-2">
+  <div class="d-flex align-items-center gap-2 flex-wrap">
     {% if request.query_params.get('msg') == 'busca_iniciada' %}
     <span class="badge bg-success fs-6 py-2 px-3">
       <i class="bi bi-check-circle me-1"></i>Busca iniciada com sucesso
@@ -22,10 +22,23 @@
   </div>
 </div>
 
+<!-- Filtros -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="/alertas/" class="btn btn-sm {{ 'btn-primary' if not filtro_ativo else 'btn-outline-secondary' }}">
+    <i class="bi bi-list me-1"></i>Todas
+  </a>
+  <a href="/alertas/?filtro=hoje" class="btn btn-sm {{ 'btn-primary' if filtro_ativo == 'hoje' else 'btn-outline-secondary' }}">
+    <i class="bi bi-calendar-event me-1"></i>Hoje
+  </a>
+  <a href="/alertas/historico-buscas" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-clock-history me-1"></i>Histórico de buscas
+  </a>
+</div>
+
 <div class="card border-0">
   <div class="card-header d-flex align-items-center gap-2">
     <i class="bi bi-newspaper"></i>
-    Publicações encontradas
+    {{ titulo_filtro|default('Publicações encontradas') }}
     <span class="badge bg-secondary ms-1">{{ alertas|length }}</span>
   </div>
   <div class="card-body p-0">

@@ -211,6 +211,20 @@ body {
   gap: 16px;
   padding: 20px;
 }
+a.metric-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius);
+  transition: transform .15s, box-shadow .15s;
+}
+a.metric-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+a.metric-card-link:active {
+  transform: translateY(0);
+}
 .metric-icon {
   width: 46px; height: 46px;
   border-radius: 10px;
