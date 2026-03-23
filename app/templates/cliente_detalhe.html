@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}{{ cliente.razao_social }} — EMC Monitor{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ cliente.razao_social }}</h1>
+    <p class="page-subtitle">Cadastro completo e termos monitorados no DOU</p>
+  </div>
+  <a href="/clientes/" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<!-- Mensagens de sucesso -->
+{% if request.query_params.get('msg') == 'salvo' %}
+<div class="alert" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;font-size:13px;" role="alert">
+  <i class="bi bi-check-circle me-1"></i>Dados do cliente salvos com sucesso.
+</div>
+{% elif request.query_params.get('msg') == 'criado' %}
+<div class="alert" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;font-size:13px;" role="alert">
+  <i class="bi bi-check-circle me-1"></i>Cliente cadastrado! Agora adicione os termos de busca abaixo.
+</div>
+{% elif request.query_params.get('msg') == 'termo_adicionado' %}
+<div class="alert" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;font-size:13px;" role="alert">
+  <i class="bi bi-check-circle me-1"></i>Termo de busca adicionado com sucesso.
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  <!-- ── Coluna esquerda: dados cadastrais ──── -->
+  <div class="col-lg-5">
+    <div class="card border-0">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-person-vcard"></i>
+        Dados do cliente
+      </div>
+      <div class="card-body p-4">
+        <form method="post" action="/clientes/{{ cliente.id }}/editar">
+
+          <div class="mb-3">
+            <label class="form-label">Razão social / Nome</label>
+            <input type="text" name="razao_social" class="form-control" required
+              value="{{ cliente.razao_social }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nome do responsável</label>
+            <input type="text" name="responsavel" class="form-control"
+              value="{{ cliente.responsavel or '' }}"
+              placeholder="Ex: João da Silva">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">E-mail de contato</label>
+            <input type="email" name="email" class="form-control"
+              value="{{ cliente.email or '' }}"
+              placeholder="Ex: contato@empresa.com.br">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Celular</label>
+            <input type="tel" name="celular" class="form-control"
+              value="{{ cliente.celular or '' }}"
+              placeholder="Ex: (41) 99999-1234">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-lg me-1"></i>Salvar alterações
+          </button>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- Info do cadastro -->
+    <div class="mt-3" style="font-size:11.5px;color:var(--clr-muted);">
+      <i class="bi bi-clock me-1"></i>
+      Cadastrado em {{ cliente.criado_em.strftime('%d/%m/%Y às %H:%M') if cliente.criado_em else '—' }}
+    </div>
+  </div>
+
+  <!-- ── Coluna direita: termos monitorados ──── -->
+  <div class="col-lg-7">
+
+    <!-- Adicionar novo termo -->
+    <div class="card border-0 mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-plus-circle" style="color:var(--clr-accent);"></i>
+        Adicionar termo de busca
+      </div>
+      <div class="card-body p-4">
+        <form method="post" action="/clientes/{{ cliente.id }}/monitorado" class="row g-2 align-items-end">
+          <div class="col">
+            <label class="form-label">Termo de busca no DOU</label>
+            <input type="text" name="termo_busca" class="form-control" required
+              placeholder="Nome da empresa ou nº do processo">
+          </div>
+          <div class="col-auto">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" class="form-select">
+              <option value="nome">Nome</option>
+              <option value="processo">Processo</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-plus"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Lista de termos monitorados -->
+    <div class="card border-0">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-list-check"></i>
+        Termos monitorados
+        <span class="badge bg-secondary ms-1">{{ cliente.monitorados|length }}</span>
+      </div>
+      <div class="card-body p-0">
+
+        {% if cliente.monitorados %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="ps-4">Termo de busca</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Alertas</th>
+                <th class="text-end pe-4">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in cliente.monitorados %}
+              <tr>
+                <td class="ps-4 font-monospace" style="font-size:12.5px;color:var(--clr-text);">
+                  {{ m.termo_busca }}
+                </td>
+                <td>
+                  {% if m.tipo == "processo" %}
+                  <span class="badge" style="background:#fef9c3;color:#b45309;">Processo</span>
+                  {% else %}
+                  <span class="badge" style="background:#dbeafe;color:#1d4ed8;">Nome</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if m.ativo %}
+                  <span class="badge" style="background:#dcfce7;color:#16a34a;">Ativo</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Pausado</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-secondary">{{ m.alertas|length }}</span>
+                </td>
+                <td class="text-end pe-4">
+                  <form method="post" action="/clientes/{{ cliente.id }}/monitorado/{{ m.id }}/toggle" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                      title="{{ 'Pausar' if m.ativo else 'Reativar' }}">
+                      <i class="bi bi-{{ 'pause' if m.ativo else 'play' }}-fill"></i>
+                    </button>
+                  </form>
+                  <form method="post" action="/clientes/{{ cliente.id }}/monitorado/{{ m.id }}/remover" class="d-inline"
+                    onsubmit="return confirm('Remover este termo de busca?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% else %}
+        <div class="empty-state" style="padding:40px 20px;">
+          <i class="bi bi-search"></i>
+          <p>Nenhum termo cadastrado.<br>
+          <span style="font-size:12.5px;">Adicione acima o nome da empresa ou número de processo para monitorar.</span></p>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Dica -->
+    <div class="alert alert-info mt-3" style="font-size:12.5px;">
+      <i class="bi bi-lightbulb me-1"></i>
+      <strong>Dica:</strong> Você pode adicionar vários termos para o mesmo cliente.
+      Por exemplo, o nome da empresa <strong>e</strong> o número do processo ANATEL.
+      O sistema busca todos automaticamente às 6h.
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Histórico de publicações no DOU ──── -->
+{% set todos_alertas = [] %}
+{% for m in cliente.monitorados %}
+  {% for a in m.alertas %}
+    {% if todos_alertas.append(a) %}{% endif %}
+  {% endfor %}
+{% endfor %}
+
+<div class="card border-0 mt-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history"></i>
+    Histórico de publicações no DOU
+    <span class="badge bg-secondary ms-1">{{ todos_alertas|length }}</span>
+  </div>
+  <div class="card-body p-0">
+
+    {% if todos_alertas %}
+    <div class="list-group list-group-flush">
+      {% for a in todos_alertas|sort(attribute='encontrado_em', reverse=True) %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div class="flex-grow-1">
+            <div class="mb-1 d-flex flex-wrap gap-1 align-items-center">
+              <span class="badge bg-secondary">Seção {{ a.secao }}</span>
+              <span class="text-muted" style="font-size:12px;">{{ a.data_publicacao }}</span>
+              {% if a.email_enviado %}
+              <span class="badge" style="background:#dcfce7;color:#16a34a;font-size:10px;">
+                <i class="bi bi-envelope-check"></i> E-mail enviado
+              </span>
+              {% endif %}
+            </div>
+            <div class="fw-semibold" style="font-size:13.5px;">{{ a.titulo }}</div>
+            {% if a.paragrafo %}
+            <div class="alert-excerpt mt-2">
+              <div class="alert-excerpt-label">Trecho onde aparece</div>
+              {{ a.paragrafo[:400] }}{% if a.paragrafo|length > 400 %}...{% endif %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="text-end flex-shrink-0">
+            {% if a.url %}
+            <a href="{{ a.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Ver no DOU
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state" style="padding:40px 20px;">
+      <i class="bi bi-newspaper"></i>
+      <p>Nenhuma publicação encontrada ainda para este cliente.<br>
+      <span style="font-size:12.5px;">As publicações aparecerão aqui conforme forem encontradas no DOU.</span></p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

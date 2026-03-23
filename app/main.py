@@ -13,7 +13,7 @@ from datetime import date, datetime
 
 from app.database import init_db, SessionLocal
 from app.models import AlertaDOU, Monitorado
-from app.routers import monitorados, alertas, configuracoes
+from app.routers import monitorados, alertas, configuracoes, clientes
 from app.routers.alertas import _executar_busca
 from app.routers import auth_router
 from app.services.auth import get_usuario_atual, criar_usuarios_iniciais, requer_login
@@ -62,6 +62,7 @@ templates = Jinja2Templates(directory="app/templates")
 app.include_router(auth_router.router)
 
 # Rotas protegidas
+app.include_router(clientes.router)
 app.include_router(monitorados.router)
 app.include_router(alertas.router)
 app.include_router(configuracoes.router)

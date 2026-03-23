@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Novo Cliente — EMC Monitor{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Novo cliente</h1>
+    <p class="page-subtitle">Cadastre os dados do cliente</p>
+  </div>
+  <a href="/clientes/" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card border-0">
+      <div class="card-body p-4">
+        <form method="post" action="/clientes/novo">
+
+          <div class="mb-3">
+            <label class="form-label">Razão social / Nome</label>
+            <input type="text" name="razao_social" class="form-control" required autofocus
+              placeholder="Ex: Rádio Evangelizar Ltda">
+            <div class="form-text">Nome completo do cliente como consta no DOU</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nome do responsável</label>
+            <input type="text" name="responsavel" class="form-control"
+              placeholder="Ex: João da Silva">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">E-mail de contato</label>
+            <input type="email" name="email" class="form-control"
+              placeholder="Ex: contato@empresa.com.br">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Celular</label>
+            <input type="tel" name="celular" class="form-control"
+              placeholder="Ex: (41) 99999-1234">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-lg me-1"></i>Cadastrar cliente
+          </button>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 mt-3 mt-lg-0">
+    <div class="alert alert-info" style="font-size:12.5px;">
+      <i class="bi bi-lightbulb me-1"></i>
+      <strong>Próximo passo:</strong> Depois de cadastrar, você poderá adicionar
+      os termos de busca (nome da empresa e processos ANATEL) na página do cliente.
+      O sistema vai monitorar automaticamente no DOU.
+    </div>
+  </div>
+</div>
+
+{% endblock %}
