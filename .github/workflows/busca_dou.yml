@@ -1,0 +1,31 @@
+name: Busca DOU — EMC Monitor
+
+on:
+  schedule:
+    # 6h00 horário de Brasília = 9h00 UTC (Brasil é UTC-3)
+    - cron: '0 9 * * 1-5'   # segunda a sexta
+  workflow_dispatch:          # permite disparar manualmente pelo GitHub
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install requests
+
+      - name: Executar busca no DOU e enviar e-mail
+        run: python scripts/buscar_dou.py
+        env:
+          INLABS_EMAIL:        ${{ secrets.INLABS_EMAIL }}
+          INLABS_SENHA:        ${{ secrets.INLABS_SENHA }}
+          EMAIL_REMETENTE:     ${{ secrets.EMAIL_REMETENTE }}
+          EMAIL_SENHA:         ${{ secrets.EMAIL_SENHA }}
+          EMAIL_DESTINATARIOS: ${{ secrets.EMAIL_DESTINATARIOS }}

@@ -1,0 +1,10 @@
+[
+  {"nome_cliente": "Fundação Lumen", "termo_busca": "Fundação Lumen", "tipo": "nome"},
+  {"nome_cliente": "Fundação Nossa Senhora do Rocio", "termo_busca": "Fundação Nossa Senhora do Rocio", "tipo": "nome"},
+  {"nome_cliente": "Fundação Cultural Nossa Senhora de Lourdes de Maringá", "termo_busca": "Fundação Cultural Nossa Senhora de Lourdes de Maringá", "tipo": "nome"},
+  {"nome_cliente": "Fundação Cultural Nova Campo Largo", "termo_busca": "Fundação Cultural Nova Campo Largo", "tipo": "nome"},
+  {"nome_cliente": "Rádio Evangelizar Ltda", "termo_busca": "Rádio Evangelizar", "tipo": "nome"},
+  {"nome_cliente": "Rádio 880 Ltda", "termo_busca": "Rádio 880", "tipo": "nome"},
+  {"nome_cliente": "Rádio Universo Ltda", "termo_busca": "Rádio Universo", "tipo": "nome"},
+  {"nome_cliente": "Rádio Nova Registro Radiodifusão Ltda", "termo_busca": "Radio Nova Registro", "tipo": "nome"}
+]
