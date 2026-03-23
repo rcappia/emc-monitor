@@ -17,11 +17,20 @@
   <div class="col-lg-6">
     <div class="card border-0">
       <div class="card-body p-4">
+
+        {% if erro %}
+        <div class="alert alert-danger d-flex align-items-center" style="font-size:13.5px;">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          {{ erro }}
+        </div>
+        {% endif %}
+
         <form method="post" action="/clientes/novo">
 
           <div class="mb-3">
             <label class="form-label">Razão social / Nome</label>
             <input type="text" name="razao_social" class="form-control" required autofocus
+              value="{{ form_data.razao_social if form_data else '' }}"
               placeholder="Ex: Rádio Evangelizar Ltda">
             <div class="form-text">Nome completo do cliente</div>
           </div>
@@ -29,6 +38,7 @@
           <div class="mb-3">
             <label class="form-label">Termo de busca no DOU</label>
             <input type="text" name="termo_busca" class="form-control"
+              value="{{ form_data.termo_busca if form_data else '' }}"
               placeholder="Ex: Radio Evangelizar">
             <div class="form-text">Como o nome aparece nas publicações do DOU (sem acentos se necessário). Se deixar vazio, usa a razão social.</div>
           </div>
@@ -36,18 +46,21 @@
           <div class="mb-3">
             <label class="form-label">Nome do responsável</label>
             <input type="text" name="responsavel" class="form-control"
+              value="{{ form_data.responsavel if form_data else '' }}"
               placeholder="Ex: João da Silva">
           </div>
 
           <div class="mb-3">
             <label class="form-label">E-mail de contato</label>
             <input type="email" name="email" class="form-control"
+              value="{{ form_data.email if form_data else '' }}"
               placeholder="Ex: contato@empresa.com.br">
           </div>
 
           <div class="mb-4">
             <label class="form-label">Celular</label>
             <input type="tel" name="celular" class="form-control"
+              value="{{ form_data.celular if form_data else '' }}"
               placeholder="Ex: (41) 99999-1234">
           </div>
 

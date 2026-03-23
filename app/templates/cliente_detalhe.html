@@ -13,6 +13,14 @@
   </a>
 </div>
 
+<!-- Mensagem de erro -->
+{% if erro %}
+<div class="alert alert-danger d-flex align-items-center" style="font-size:13.5px;">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  {{ erro }}
+</div>
+{% endif %}
+
 <!-- Mensagens de sucesso -->
 {% if request.query_params.get('msg') == 'salvo' %}
 <div class="alert" style="background:#dcfce7;color:#15803d;border-color:#bbf7d0;font-size:13px;">
