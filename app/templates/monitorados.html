@@ -1,108 +1,113 @@
 {% extends "base.html" %}
-{% block title %}Termos Monitorados — EMC Monitor{% endblock %}
+{% block title %}Clientes Monitorados — EMC Monitor{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-  <div class="col">
-    <h4 class="fw-bold text-dark">
-      <i class="bi bi-search me-2 text-primary"></i>Termos Monitorados
-    </h4>
-    <p class="text-muted mb-0">Cadastre nomes de clientes ou números de processo para monitorar no DOU</p>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Clientes monitorados</h1>
+    <p class="page-subtitle">Adicione os clientes que devem ser monitorados no DOU</p>
   </div>
 </div>
 
 <div class="row g-4">
+
   <!-- Formulário de adição -->
   <div class="col-lg-4">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-bottom py-3">
-        <h6 class="mb-0 fw-semibold"><i class="bi bi-plus-circle me-2 text-primary"></i>Adicionar termo</h6>
+    <div class="card border-0">
+      <div class="card-header">
+        <i class="bi bi-plus-circle me-2" style="color:var(--clr-accent);"></i>Adicionar cliente
       </div>
-      <div class="card-body">
+      <div class="card-body p-4">
         <form method="post" action="/monitorados/adicionar">
+
           <div class="mb-3">
-            <label class="form-label fw-medium">Nome do cliente</label>
+            <label class="form-label">Nome do cliente</label>
             <input type="text" name="nome_cliente" class="form-control" required
               placeholder="Ex: Rádio Cultura de SP">
             <div class="form-text">Nome que aparecerá nos alertas e e-mails</div>
           </div>
+
           <div class="mb-3">
-            <label class="form-label fw-medium">Termo de busca no DOU</label>
+            <label class="form-label">Termo de busca no DOU</label>
             <input type="text" name="termo_busca" class="form-control" required
-              placeholder="Ex: nome da empresa ou nº processo">
+              placeholder="Nome ou número de processo">
             <div class="form-text">Exatamente como aparece nas publicações do DOU</div>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-medium">Tipo</label>
+
+          <div class="mb-4">
+            <label class="form-label">Tipo de busca</label>
             <select name="tipo" class="form-select">
               <option value="nome">Nome / Razão social</option>
-              <option value="processo">Número de processo</option>
+              <option value="processo">Número de processo ANATEL</option>
             </select>
           </div>
+
           <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-plus me-1"></i>Adicionar
+            <i class="bi bi-plus me-1"></i>Adicionar cliente
           </button>
         </form>
       </div>
     </div>
 
-    <div class="alert alert-info mt-3 small">
-      <i class="bi bi-info-circle me-1"></i>
-      <strong>Dica:</strong> Para processos ANATEL, use o formato exato do número
-      (ex: <code>53500.000123/2021-00</code>). Para nomes, use o nome completo da empresa como consta no DOU.
+    <div class="alert alert-info mt-3" style="font-size:12.5px;">
+      <i class="bi bi-lightbulb me-1"></i>
+      <strong>Dica:</strong> Para processos ANATEL, use o número exato
+      (ex: <code>53500.000123/2021-00</code>). Para nomes de empresas, use o nome como consta no DOU.
     </div>
   </div>
 
-  <!-- Lista de monitorados -->
+  <!-- Lista de clientes cadastrados -->
   <div class="col-lg-8">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-bottom py-3">
-        <h6 class="mb-0 fw-semibold">
-          <i class="bi bi-list-check me-2"></i>Cadastrados
-          <span class="badge bg-primary ms-1">{{ monitorados|length }}</span>
-        </h6>
+    <div class="card border-0">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-list-check"></i>
+        Clientes cadastrados
+        <span class="badge bg-secondary ms-1">{{ monitorados|length }}</span>
       </div>
       <div class="card-body p-0">
+
         {% if monitorados %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+          <table class="table table-hover mb-0">
+            <thead>
               <tr>
-                <th class="px-4">Cliente</th>
-                <th>Termo de busca</th>
+                <th class="ps-4">Cliente</th>
+                <th>Busca no DOU</th>
                 <th>Tipo</th>
                 <th>Status</th>
-                <th class="text-end px-4">Ações</th>
+                <th class="text-end pe-4">Ações</th>
               </tr>
             </thead>
             <tbody>
               {% for m in monitorados %}
               <tr>
-                <td class="px-4 fw-medium">{{ m.nome_cliente }}</td>
-                <td class="text-muted font-monospace small">{{ m.termo_busca }}</td>
+                <td class="ps-4 fw-medium">{{ m.nome_cliente }}</td>
+                <td class="font-monospace text-muted" style="font-size:12.5px;">{{ m.termo_busca }}</td>
                 <td>
                   {% if m.tipo == "processo" %}
-                  <span class="badge bg-warning text-dark">Processo</span>
+                  <span class="badge" style="background:#fef9c3;color:#b45309;">Processo</span>
                   {% else %}
-                  <span class="badge bg-info text-dark">Nome</span>
+                  <span class="badge" style="background:#dbeafe;color:#1d4ed8;">Nome</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if m.ativo %}
-                  <span class="badge bg-success">Ativo</span>
+                  <span class="badge" style="background:#dcfce7;color:#16a34a;">Ativo</span>
                   {% else %}
                   <span class="badge bg-secondary">Pausado</span>
                   {% endif %}
                 </td>
-                <td class="text-end px-4">
+                <td class="text-end pe-4">
                   <form method="post" action="/monitorados/toggle/{{ m.id }}" class="d-inline">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="{{ 'Pausar' if m.ativo else 'Reativar' }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                      title="{{ 'Pausar monitoramento' if m.ativo else 'Reativar monitoramento' }}">
                       <i class="bi bi-{{ 'pause' if m.ativo else 'play' }}-fill"></i>
                     </button>
                   </form>
                   <form method="post" action="/monitorados/remover/{{ m.id }}" class="d-inline"
-                    onsubmit="return confirm('Remover {{ m.nome_cliente }}?')">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover">
+                    onsubmit="return confirm('Remover {{ m.nome_cliente }} dos monitorados?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover cliente">
                       <i class="bi bi-trash"></i>
                     </button>
                   </form>
@@ -112,15 +117,18 @@
             </tbody>
           </table>
         </div>
+
         {% else %}
-        <div class="text-center py-5 text-muted">
-          <i class="bi bi-search fs-1 d-block mb-2"></i>
-          Nenhum termo cadastrado ainda.<br>
-          <small>Use o formulário ao lado para adicionar o primeiro.</small>
+        <div class="empty-state">
+          <i class="bi bi-people"></i>
+          <p>Nenhum cliente cadastrado ainda.<br>
+          <span style="font-size:12.5px;">Use o formulário ao lado para adicionar o primeiro.</span></p>
         </div>
         {% endif %}
+
       </div>
     </div>
   </div>
+
 </div>
 {% endblock %}

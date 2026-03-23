@@ -2,80 +2,87 @@
 {% block title %}Alertas DOU — EMC Monitor{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-  <div class="col">
-    <h4 class="fw-bold text-dark">
-      <i class="bi bi-bell me-2 text-warning"></i>Alertas DOU
-    </h4>
-    <p class="text-muted mb-0">Publicações encontradas no Diário Oficial da União</p>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Alertas do DOU</h1>
+    <p class="page-subtitle">Publicações encontradas no Diário Oficial da União</p>
   </div>
-  <div class="col-auto d-flex align-items-center gap-2">
+  <div class="d-flex align-items-center gap-2">
     {% if request.query_params.get('msg') == 'busca_iniciada' %}
     <span class="badge bg-success fs-6 py-2 px-3">
-      <i class="bi bi-check-circle me-1"></i>Busca iniciada em background
+      <i class="bi bi-check-circle me-1"></i>Busca iniciada com sucesso
     </span>
     {% endif %}
     <form method="post" action="/alertas/buscar-agora">
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-search me-1"></i>Buscar agora
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="bi bi-search me-2"></i>Buscar agora
       </button>
     </form>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-header bg-white border-bottom py-3">
-    <h6 class="mb-0 fw-semibold">
-      <i class="bi bi-newspaper me-2"></i>Publicações encontradas
-      <span class="badge bg-warning text-dark ms-1">{{ alertas|length }}</span>
-    </h6>
+<div class="card border-0">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-newspaper"></i>
+    Publicações encontradas
+    <span class="badge bg-secondary ms-1">{{ alertas|length }}</span>
   </div>
   <div class="card-body p-0">
+
     {% if alertas %}
     <div class="list-group list-group-flush">
       {% for alerta in alertas %}
-      <div class="list-group-item px-4 py-3">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+
           <div class="flex-grow-1">
-            <div class="mb-1">
-              <span class="badge bg-primary me-1">{{ alerta.monitorado.nome_cliente }}</span>
-              <span class="badge bg-secondary me-1">Seção {{ alerta.secao }}</span>
+            <div class="mb-1 d-flex flex-wrap gap-1 align-items-center">
+              <span class="badge bg-primary">{{ alerta.monitorado.nome_cliente }}</span>
+              <span class="badge bg-secondary">Seção {{ alerta.secao }}</span>
               {% if alerta.email_enviado %}
-              <span class="badge bg-success-subtle text-success border border-success-subtle">
+              <span class="badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;">
                 <i class="bi bi-envelope-check me-1"></i>E-mail enviado
               </span>
               {% endif %}
             </div>
-            <div class="fw-semibold">{{ alerta.titulo }}</div>
+            <div class="fw-semibold" style="font-size:13.5px;">{{ alerta.titulo }}</div>
             {% if alerta.paragrafo %}
-            <div class="mt-2 p-2 rounded" style="background:#f8f9fa;border-left:3px solid #003087;font-size:13px;color:#374151;line-height:1.6;">
-              <div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Trecho onde aparece</div>
+            <div class="alert-excerpt">
+              <div class="alert-excerpt-label">Trecho onde aparece</div>
               {{ alerta.paragrafo }}
             </div>
             {% elif alerta.resumo %}
-            <div class="text-muted small mt-1">{{ alerta.resumo }}</div>
+            <div class="text-muted mt-1" style="font-size:13px;">{{ alerta.resumo }}</div>
             {% endif %}
           </div>
+
           <div class="text-end flex-shrink-0">
-            <div class="text-muted small">{{ alerta.data_publicacao }}</div>
-            <div class="text-muted small">{{ alerta.encontrado_em.strftime('%d/%m %H:%M') if alerta.encontrado_em else '' }}</div>
+            <div class="text-muted" style="font-size:12px;">{{ alerta.data_publicacao }}</div>
+            <div class="text-muted" style="font-size:11px;">
+              {{ alerta.encontrado_em.strftime('%d/%m às %H:%M') if alerta.encontrado_em else '' }}
+            </div>
             {% if alerta.url %}
-            <a href="{{ alerta.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+            <a href="{{ alerta.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
               <i class="bi bi-box-arrow-up-right me-1"></i>Ver no DOU
             </a>
             {% endif %}
           </div>
+
         </div>
       </div>
       {% endfor %}
     </div>
+
     {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-      Nenhuma publicação encontrada ainda.<br>
-      <small>Clique em <strong>Buscar agora</strong> para iniciar o monitoramento.</small>
+    <div class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p>Nenhuma publicação encontrada ainda.<br>
+      <span style="font-size:12.5px;">Clique em <strong>Buscar agora</strong> para iniciar o monitoramento.</span></p>
     </div>
     {% endif %}
+
   </div>
 </div>
+
 {% endblock %}
