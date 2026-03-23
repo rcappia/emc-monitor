@@ -162,6 +162,26 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
+
+# Handler de erro para mostrar detalhes ao invés de "Internal Server Error"
+@app.exception_handler(500)
+async def erro_interno(request: Request, exc):
+    import traceback
+    erro = traceback.format_exc()
+    print(f"ERRO 500 em {request.url.path}: {erro}")
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(f"Erro interno:\n{erro}", status_code=500)
+
+
+@app.exception_handler(Exception)
+async def erro_geral(request: Request, exc):
+    import traceback
+    erro = traceback.format_exception(type(exc), exc, exc.__traceback__)
+    erro_str = "".join(erro)
+    print(f"ERRO em {request.url.path}: {erro_str}")
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(f"Erro interno:\n{erro_str}", status_code=500)
+
 # Rotas públicas (sem login)
 app.include_router(auth_router.router)
 
