@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
-from app.models import Cliente, Monitorado
+from app.models import Cliente, ProcessoCliente
 from app.services.auth import get_usuario_atual
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
@@ -12,10 +12,9 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/", response_class=HTMLResponse)
 def listar_clientes(request: Request, db: Session = Depends(get_db)):
-    """Lista todos os clientes cadastrados."""
     clientes = (
         db.query(Cliente)
-        .options(joinedload(Cliente.monitorados))
+        .options(joinedload(Cliente.processos), joinedload(Cliente.alertas))
         .order_by(Cliente.razao_social)
         .all()
     )
@@ -28,7 +27,6 @@ def listar_clientes(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/novo", response_class=HTMLResponse)
 def form_novo_cliente(request: Request):
-    """Formulário para cadastrar novo cliente."""
     return templates.TemplateResponse("cliente_form.html", {
         "request": request,
         "cliente": None,
@@ -39,14 +37,15 @@ def form_novo_cliente(request: Request):
 @router.post("/novo")
 def criar_cliente(
     razao_social: str = Form(...),
+    termo_busca: str = Form(""),
     responsavel: str = Form(""),
     email: str = Form(""),
     celular: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Cria novo cliente."""
     cliente = Cliente(
         razao_social=razao_social.strip(),
+        termo_busca=termo_busca.strip() or razao_social.strip(),
         responsavel=responsavel.strip(),
         email=email.strip(),
         celular=celular.strip(),
@@ -58,10 +57,9 @@ def criar_cliente(
 
 @router.get("/{cliente_id}", response_class=HTMLResponse)
 def detalhe_cliente(cliente_id: int, request: Request, db: Session = Depends(get_db)):
-    """Página de detalhes e edição do cliente."""
     cliente = (
         db.query(Cliente)
-        .options(joinedload(Cliente.monitorados).joinedload(Monitorado.alertas))
+        .options(joinedload(Cliente.processos), joinedload(Cliente.alertas))
         .filter(Cliente.id == cliente_id)
         .first()
     )
@@ -79,15 +77,16 @@ def detalhe_cliente(cliente_id: int, request: Request, db: Session = Depends(get
 def editar_cliente(
     cliente_id: int,
     razao_social: str = Form(...),
+    termo_busca: str = Form(""),
     responsavel: str = Form(""),
     email: str = Form(""),
     celular: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Atualiza dados do cliente."""
     cliente = db.get(Cliente, cliente_id)
     if cliente:
         cliente.razao_social = razao_social.strip()
+        cliente.termo_busca = termo_busca.strip() or razao_social.strip()
         cliente.responsavel = responsavel.strip()
         cliente.email = email.strip()
         cliente.celular = celular.strip()
@@ -95,47 +94,40 @@ def editar_cliente(
     return RedirectResponse(url=f"/clientes/{cliente_id}?msg=salvo", status_code=303)
 
 
-@router.post("/{cliente_id}/monitorado")
-def adicionar_monitorado(
+# ── Processos ANATEL do cliente ───────────────────────────────────────────────
+
+@router.post("/{cliente_id}/processo")
+def adicionar_processo(
     cliente_id: int,
-    termo_busca: str = Form(...),
-    tipo: str = Form("nome"),
+    numero_processo: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Adiciona um termo monitorado vinculado ao cliente."""
     cliente = db.get(Cliente, cliente_id)
     if not cliente:
         return RedirectResponse(url="/clientes/", status_code=302)
 
-    # Para tipo "nome", o nome_cliente é a razão social
-    nome = cliente.razao_social if tipo == "nome" else cliente.razao_social
-
-    item = Monitorado(
-        nome_cliente=nome,
-        termo_busca=termo_busca.strip(),
-        tipo=tipo,
+    proc = ProcessoCliente(
         cliente_id=cliente_id,
+        numero_processo=numero_processo.strip(),
     )
-    db.add(item)
+    db.add(proc)
     db.commit()
-    return RedirectResponse(url=f"/clientes/{cliente_id}?msg=termo_adicionado", status_code=303)
+    return RedirectResponse(url=f"/clientes/{cliente_id}?msg=processo_adicionado", status_code=303)
 
 
-@router.post("/{cliente_id}/monitorado/{item_id}/remover")
-def remover_monitorado(cliente_id: int, item_id: int, db: Session = Depends(get_db)):
-    """Remove um termo monitorado do cliente."""
-    item = db.get(Monitorado, item_id)
-    if item and item.cliente_id == cliente_id:
-        db.delete(item)
+@router.post("/{cliente_id}/processo/{proc_id}/remover")
+def remover_processo(cliente_id: int, proc_id: int, db: Session = Depends(get_db)):
+    proc = db.get(ProcessoCliente, proc_id)
+    if proc and proc.cliente_id == cliente_id:
+        db.delete(proc)
         db.commit()
     return RedirectResponse(url=f"/clientes/{cliente_id}", status_code=303)
 
 
-@router.post("/{cliente_id}/monitorado/{item_id}/toggle")
-def toggle_monitorado(cliente_id: int, item_id: int, db: Session = Depends(get_db)):
-    """Pausa ou reativa um termo monitorado."""
-    item = db.get(Monitorado, item_id)
-    if item and item.cliente_id == cliente_id:
-        item.ativo = not item.ativo
+@router.post("/{cliente_id}/processo/{proc_id}/toggle")
+def toggle_processo(cliente_id: int, proc_id: int, db: Session = Depends(get_db)):
+    proc = db.get(ProcessoCliente, proc_id)
+    if proc and proc.cliente_id == cliente_id:
+        proc.ativo = not proc.ativo
         db.commit()
     return RedirectResponse(url=f"/clientes/{cliente_id}", status_code=303)

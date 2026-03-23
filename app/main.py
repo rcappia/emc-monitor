@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 
 from app.database import init_db, SessionLocal
-from app.models import AlertaDOU, Monitorado, Cliente
+from app.models import AlertaDOU, Monitorado, Cliente, ProcessoCliente
 from app.routers import monitorados, alertas, configuracoes, clientes
 from app.routers.alertas import _executar_busca
 from app.routers import auth_router
@@ -32,33 +32,58 @@ def tarefa_diaria():
 
 def migrar_monitorados_para_clientes(db: Session):
     """
-    Migração automática: cria registros na tabela 'clientes' para cada
-    monitorado existente que ainda não tem cliente_id vinculado.
-    Agrupa por nome_cliente para não criar duplicatas.
+    Migração automática:
+    1. Cria Cliente para cada monitorado tipo 'nome' (se não existir)
+    2. Cria ProcessoCliente para cada monitorado tipo 'processo'
+    3. Vincula alertas antigos (que tem monitorado_id) ao cliente correspondente
     """
-    orfaos = db.query(Monitorado).filter(Monitorado.cliente_id == None).all()
+    orfaos = db.query(Monitorado).all()
     if not orfaos:
         return
 
-    # Agrupa por nome_cliente
-    grupos: dict[str, list[Monitorado]] = {}
-    for m in orfaos:
-        chave = m.nome_cliente.strip()
-        grupos.setdefault(chave, []).append(m)
-
     criados = 0
-    for razao, monitorados_grupo in grupos.items():
-        # Verifica se já existe um cliente com essa razão social
-        cliente = db.query(Cliente).filter(Cliente.razao_social == razao).first()
+    for m in orfaos:
+        # Verifica se já existe cliente com essa razão social
+        cliente = db.query(Cliente).filter(Cliente.razao_social == m.nome_cliente.strip()).first()
+
         if not cliente:
-            cliente = Cliente(razao_social=razao)
+            cliente = Cliente(
+                razao_social=m.nome_cliente.strip(),
+                termo_busca=m.termo_busca.strip() if m.tipo == "nome" else "",
+                ativo=m.ativo,
+            )
             db.add(cliente)
-            db.flush()  # gera o id
+            db.flush()
             criados += 1
 
-        # Vincula todos os monitorados deste grupo ao cliente
-        for m in monitorados_grupo:
-            m.cliente_id = cliente.id
+        # Se for processo, cria registro em processos_cliente
+        if m.tipo == "processo":
+            ja_existe = (
+                db.query(ProcessoCliente)
+                .filter(ProcessoCliente.cliente_id == cliente.id)
+                .filter(ProcessoCliente.numero_processo == m.termo_busca.strip())
+                .first()
+            )
+            if not ja_existe:
+                proc = ProcessoCliente(
+                    cliente_id=cliente.id,
+                    numero_processo=m.termo_busca.strip(),
+                    ativo=m.ativo,
+                )
+                db.add(proc)
+        elif not cliente.termo_busca:
+            # Atualiza termo de busca se ainda não tinha
+            cliente.termo_busca = m.termo_busca.strip()
+
+        # Vincula alertas antigos ao cliente
+        alertas_sem_cliente = (
+            db.query(AlertaDOU)
+            .filter(AlertaDOU.monitorado_id == m.id)
+            .filter(AlertaDOU.cliente_id == None)
+            .all()
+        )
+        for a in alertas_sem_cliente:
+            a.cliente_id = cliente.id
 
     db.commit()
     if criados:
@@ -132,7 +157,7 @@ def dashboard(request: Request):
     try:
         hoje = date.today().strftime("%Y-%m-%d")
 
-        total_monitorados = db.query(Monitorado).filter(Monitorado.ativo == True).count()
+        total_monitorados = db.query(Cliente).filter(Cliente.ativo == True).count()
         total_alertas = db.query(AlertaDOU).count()
         total_alertas_hoje = (
             db.query(AlertaDOU)

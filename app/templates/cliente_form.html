@@ -23,7 +23,14 @@
             <label class="form-label">Razão social / Nome</label>
             <input type="text" name="razao_social" class="form-control" required autofocus
               placeholder="Ex: Rádio Evangelizar Ltda">
-            <div class="form-text">Nome completo do cliente como consta no DOU</div>
+            <div class="form-text">Nome completo do cliente</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Termo de busca no DOU</label>
+            <input type="text" name="termo_busca" class="form-control"
+              placeholder="Ex: Radio Evangelizar">
+            <div class="form-text">Como o nome aparece nas publicações do DOU (sem acentos se necessário). Se deixar vazio, usa a razão social.</div>
           </div>
 
           <div class="mb-3">
@@ -57,8 +64,8 @@
     <div class="alert alert-info" style="font-size:12.5px;">
       <i class="bi bi-lightbulb me-1"></i>
       <strong>Próximo passo:</strong> Depois de cadastrar, você poderá adicionar
-      os termos de busca (nome da empresa e processos ANATEL) na página do cliente.
-      O sistema vai monitorar automaticamente no DOU.
+      os números de processos ANATEL na página do cliente.
+      O sistema busca automaticamente pelo nome e por cada processo no DOU.
     </div>
   </div>
 </div>

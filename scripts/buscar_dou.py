@@ -45,20 +45,53 @@ SMTP_PORT = 587
 # ── Clientes: banco ou arquivo ────────────────────────────────────────────────
 
 def _carregar_clientes() -> list[dict]:
-    """Carrega lista de clientes do Supabase (se disponível) ou clientes.json."""
+    """
+    Carrega clientes da tabela 'clientes' + processos de 'processos_cliente'.
+    Cada cliente gera um item tipo 'nome' (busca pela razão social).
+    Cada processo gera um item tipo 'processo'.
+    Fallback: clientes.json se não tiver banco.
+    """
     if DATABASE_URL:
         try:
             import psycopg2
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
+
+            # Clientes ativos — busca pelo nome/razão social
             cur.execute(
-                "SELECT id, nome_cliente, termo_busca, tipo FROM monitorados WHERE ativo = TRUE"
+                "SELECT id, razao_social, termo_busca FROM clientes WHERE ativo = TRUE"
             )
-            rows = cur.fetchall()
+            clientes_rows = cur.fetchall()
+
+            itens = []
+            for cid, razao, termo in clientes_rows:
+                termo_busca = (termo or "").strip() or razao.strip()
+                itens.append({
+                    "id": cid,
+                    "nome_cliente": razao,
+                    "termo_busca": termo_busca,
+                    "tipo": "nome",
+                })
+
+            # Processos ativos de cada cliente
+            cur.execute("""
+                SELECT pc.numero_processo, c.id, c.razao_social
+                FROM processos_cliente pc
+                JOIN clientes c ON c.id = pc.cliente_id
+                WHERE pc.ativo = TRUE AND c.ativo = TRUE
+            """)
+            for num_proc, cid, razao in cur.fetchall():
+                itens.append({
+                    "id": cid,
+                    "nome_cliente": razao,
+                    "termo_busca": num_proc.strip(),
+                    "tipo": "processo",
+                })
+
             cur.close()
             conn.close()
-            print(f"Clientes carregados do banco de dados: {len(rows)}")
-            return [{"id": r[0], "nome_cliente": r[1], "termo_busca": r[2], "tipo": r[3]} for r in rows]
+            print(f"Carregados do banco: {len(clientes_rows)} clientes + {len(itens) - len(clientes_rows)} processos = {len(itens)} buscas")
+            return itens
         except Exception as exc:
             print(f"[AVISO] Falha ao conectar ao banco: {exc} — usando clientes.json")
 
@@ -70,31 +103,33 @@ def _carregar_clientes() -> list[dict]:
     return clientes
 
 
-def _salvar_alerta_db(monitorado_id: int, resultado: dict):
-    """Salva um alerta no Supabase, evitando duplicatas."""
-    if not DATABASE_URL or monitorado_id is None:
+def _salvar_alerta_db(cliente_id: int, resultado: dict):
+    """Salva um alerta no Supabase vinculado ao cliente, evitando duplicatas."""
+    if not DATABASE_URL or cliente_id is None:
         return
     try:
         import psycopg2
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute(
-            "SELECT id FROM alertas_dou WHERE monitorado_id = %s AND data_publicacao = %s AND titulo = %s",
-            (monitorado_id, resultado["data_publicacao"], resultado["titulo"][:500]),
+            "SELECT id FROM alertas_dou WHERE cliente_id = %s AND data_publicacao = %s AND titulo = %s",
+            (cliente_id, resultado["data_publicacao"], resultado["titulo"][:500]),
         )
         if not cur.fetchone():
             cur.execute(
                 """INSERT INTO alertas_dou
-                   (monitorado_id, data_publicacao, secao, titulo, resumo, paragrafo, url, email_enviado, encontrado_em)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s)""",
+                   (cliente_id, data_publicacao, secao, titulo, resumo, paragrafo, url,
+                    termo_encontrado, email_enviado, encontrado_em)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)""",
                 (
-                    monitorado_id,
+                    cliente_id,
                     resultado["data_publicacao"],
                     resultado["secao"],
                     resultado["titulo"][:500],
                     "",
                     resultado.get("paragrafo", ""),
                     resultado.get("url", ""),
+                    resultado.get("termo_busca", ""),
                     datetime.utcnow(),
                 ),
             )
@@ -224,7 +259,7 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
         nome = cliente["nome_cliente"]
         termo = cliente["termo_busca"]
         tipo = cliente["tipo"]
-        monitorado_id = cliente.get("id")
+        cliente_id = cliente.get("id")
         print(f"  Buscando: {nome}...", end=" ", flush=True)
         encontrados = []
         for secao in SECOES:
@@ -249,7 +284,7 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
                             item["termo_busca"] = termo
                             encontrados.append(item)
                             # Salva no banco de dados (Supabase)
-                            _salvar_alerta_db(monitorado_id, item)
+                            _salvar_alerta_db(cliente_id, item)
             except Exception as exc:
                 print(f"\n  [AVISO] Erro em {secao}: {exc}")
         print(f"{len(encontrados)} resultado(s)")

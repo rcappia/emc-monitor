@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Clientes</h1>
-    <p class="page-subtitle">Gerencie os clientes do escritório e seus termos de busca no DOU</p>
+    <p class="page-subtitle">Gerencie os clientes e seus processos monitorados no DOU</p>
   </div>
   <a href="/clientes/novo" class="btn btn-primary px-4">
     <i class="bi bi-plus-lg me-2"></i>Novo cliente
@@ -18,20 +18,12 @@
   {% for c in clientes %}
   <div class="col-sm-6 col-xl-4">
     <a href="/clientes/{{ c.id }}" class="text-decoration-none">
-      <div class="card border-0 h-100" style="cursor:pointer;transition:box-shadow .15s;">
+      <div class="card border-0 h-100" style="cursor:pointer;">
         <div class="card-body p-4">
 
-          <!-- Nome e status -->
-          <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <div class="fw-bold" style="font-size:15px;color:var(--clr-text);">
-                {{ c.razao_social }}
-              </div>
-              {% if c.responsavel %}
-              <div class="text-muted" style="font-size:12px;margin-top:2px;">
-                <i class="bi bi-person me-1"></i>{{ c.responsavel }}
-              </div>
-              {% endif %}
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="fw-bold" style="font-size:15px;color:var(--clr-text);">
+              {{ c.razao_social }}
             </div>
             {% if c.ativo %}
             <span class="badge" style="background:#dcfce7;color:#16a34a;">Ativo</span>
@@ -40,7 +32,12 @@
             {% endif %}
           </div>
 
-          <!-- Contato -->
+          {% if c.responsavel %}
+          <div class="text-muted" style="font-size:12px;margin-bottom:6px;">
+            <i class="bi bi-person me-1"></i>{{ c.responsavel }}
+          </div>
+          {% endif %}
+
           <div class="d-flex flex-wrap gap-3 mb-3" style="font-size:12px;color:var(--clr-muted);">
             {% if c.email %}
             <span><i class="bi bi-envelope me-1"></i>{{ c.email }}</span>
@@ -50,22 +47,19 @@
             {% endif %}
           </div>
 
-          <!-- Contagem de termos monitorados -->
           <div class="d-flex gap-3" style="font-size:12px;">
-            {% set nomes = c.monitorados|selectattr("tipo", "equalto", "nome")|list %}
-            {% set processos = c.monitorados|selectattr("tipo", "equalto", "processo")|list %}
-            {% if nomes %}
             <span style="color:var(--clr-accent);">
-              <i class="bi bi-search me-1"></i>{{ nomes|length }} nome{{ 's' if nomes|length > 1 else '' }}
+              <i class="bi bi-search me-1"></i>Busca: {{ c.termo_busca or c.razao_social }}
             </span>
-            {% endif %}
-            {% if processos %}
+            {% if c.processos %}
             <span style="color:#b45309;">
-              <i class="bi bi-file-earmark-text me-1"></i>{{ processos|length }} processo{{ 's' if processos|length > 1 else '' }}
+              <i class="bi bi-file-earmark-text me-1"></i>{{ c.processos|length }} processo{{ 's' if c.processos|length > 1 else '' }}
             </span>
             {% endif %}
-            {% if not nomes and not processos %}
-            <span class="text-muted"><i class="bi bi-dash me-1"></i>Sem termos cadastrados</span>
+            {% if c.alertas %}
+            <span class="text-muted">
+              <i class="bi bi-bell me-1"></i>{{ c.alertas|length }} alerta{{ 's' if c.alertas|length > 1 else '' }}
+            </span>
             {% endif %}
           </div>
 
