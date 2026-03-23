@@ -1,0 +1,60 @@
+body {
+  background-color: #f4f6f9;
+  color: #212529;
+}
+
+.navbar-brand {
+  font-size: 1.1rem;
+  letter-spacing: 0.3px;
+}
+
+.card {
+  border-radius: 10px;
+}
+
+.card-header {
+  border-radius: 10px 10px 0 0 !important;
+  font-size: 0.9rem;
+}
+
+.table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.badge {
+  font-weight: 500;
+}
+
+.list-group-item {
+  border-left: none;
+  border-right: none;
+}
+
+.list-group-item:first-child {
+  border-top: none;
+}
+
+.btn {
+  border-radius: 6px;
+}
+
+.form-control, .form-select {
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.alert {
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+code {
+  background: #f0f0f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85em;
+}

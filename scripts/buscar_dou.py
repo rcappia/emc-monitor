@@ -2,6 +2,10 @@
 Busca automática no DOU via INLABS e envia e-mail de alerta.
 Executado pelo GitHub Actions todo dia útil às 6h (horário de Brasília).
 Credenciais lidas de variáveis de ambiente (GitHub Secrets).
+
+Se DATABASE_URL estiver configurado (Supabase), lê os clientes do banco
+e salva os alertas encontrados — ficam visíveis no painel web.
+Caso contrário, lê de clientes.json (modo local/fallback).
 """
 import io
 import json
@@ -25,6 +29,11 @@ EMAIL_REMETENTE = os.environ["EMAIL_REMETENTE"]
 EMAIL_SENHA = os.environ["EMAIL_SENHA"]
 EMAIL_DESTINATARIOS = [e.strip() for e in os.environ["EMAIL_DESTINATARIOS"].split(",") if e.strip()]
 
+# ── Banco de dados (opcional — Supabase em produção) ──────────────────────────
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # ── Configurações ─────────────────────────────────────────────────────────────
 URL_LOGIN = "https://inlabs.in.gov.br/logar.php"
 URL_BASE = "https://inlabs.in.gov.br/index.php?p="
@@ -32,9 +41,71 @@ SECOES = ["DO1", "DO2", "DO3"]
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# ── Clientes monitorados ──────────────────────────────────────────────────────
-arquivo_clientes = Path(__file__).parent.parent / "clientes.json"
-CLIENTES = json.loads(arquivo_clientes.read_text(encoding="utf-8"))
+
+# ── Clientes: banco ou arquivo ────────────────────────────────────────────────
+
+def _carregar_clientes() -> list[dict]:
+    """Carrega lista de clientes do Supabase (se disponível) ou clientes.json."""
+    if DATABASE_URL:
+        try:
+            import psycopg2
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, nome_cliente, termo_busca, tipo FROM monitorados WHERE ativo = TRUE"
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            print(f"Clientes carregados do banco de dados: {len(rows)}")
+            return [{"id": r[0], "nome_cliente": r[1], "termo_busca": r[2], "tipo": r[3]} for r in rows]
+        except Exception as exc:
+            print(f"[AVISO] Falha ao conectar ao banco: {exc} — usando clientes.json")
+
+    arquivo = Path(__file__).parent.parent / "clientes.json"
+    clientes = json.loads(arquivo.read_text(encoding="utf-8"))
+    for c in clientes:
+        c.setdefault("id", None)
+    print(f"Clientes carregados de clientes.json: {len(clientes)}")
+    return clientes
+
+
+def _salvar_alerta_db(monitorado_id: int, resultado: dict):
+    """Salva um alerta no Supabase, evitando duplicatas."""
+    if not DATABASE_URL or monitorado_id is None:
+        return
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM alertas_dou WHERE monitorado_id = %s AND data_publicacao = %s AND titulo = %s",
+            (monitorado_id, resultado["data_publicacao"], resultado["titulo"][:500]),
+        )
+        if not cur.fetchone():
+            cur.execute(
+                """INSERT INTO alertas_dou
+                   (monitorado_id, data_publicacao, secao, titulo, resumo, paragrafo, url, email_enviado, encontrado_em)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s)""",
+                (
+                    monitorado_id,
+                    resultado["data_publicacao"],
+                    resultado["secao"],
+                    resultado["titulo"][:500],
+                    "",
+                    resultado.get("paragrafo", ""),
+                    resultado.get("url", ""),
+                    datetime.utcnow(),
+                ),
+            )
+            conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        print(f"[AVISO] Erro ao salvar alerta no banco: {exc}")
+
+
+CLIENTES = _carregar_clientes()
 
 
 # ── INLABS ────────────────────────────────────────────────────────────────────
@@ -153,6 +224,7 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
         nome = cliente["nome_cliente"]
         termo = cliente["termo_busca"]
         tipo = cliente["tipo"]
+        monitorado_id = cliente.get("id")
         print(f"  Buscando: {nome}...", end=" ", flush=True)
         encontrados = []
         for secao in SECOES:
@@ -176,6 +248,8 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
                             item["tipo"] = tipo
                             item["termo_busca"] = termo
                             encontrados.append(item)
+                            # Salva no banco de dados (Supabase)
+                            _salvar_alerta_db(monitorado_id, item)
             except Exception as exc:
                 print(f"\n  [AVISO] Erro em {secao}: {exc}")
         print(f"{len(encontrados)} resultado(s)")
@@ -268,6 +342,7 @@ if __name__ == "__main__":
     hoje = date.today()
     print(f"EMC Monitor — Busca DOU {hoje.strftime('%d/%m/%Y')}")
     print(f"Dia da semana: {hoje.strftime('%A')}")
+    print(f"Banco de dados: {'Supabase' if DATABASE_URL else 'clientes.json (sem banco)'}")
     print()
 
     session = login_inlabs()

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Configurações — EMC Monitor{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col">
+    <h4 class="fw-bold text-dark">
+      <i class="bi bi-gear me-2 text-primary"></i>Configurações
+    </h4>
+    <p class="text-muted mb-0">E-mail de notificação e dados do escritório</p>
+  </div>
+</div>
+
+{% if request.query_params.get('salvo') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle me-2"></i>Configurações salvas com sucesso!
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <form method="post" action="/configuracoes/salvar">
+      <!-- E-mail -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-envelope me-2 text-primary"></i>E-mail de notificação (Outlook)</h6>
+        </div>
+        <div class="card-body">
+          {% for chave, label, tipo in campos[:3] %}
+          <div class="mb-3">
+            <label class="form-label fw-medium">{{ label }}</label>
+            <input type="{{ tipo }}" name="{{ chave }}" class="form-control"
+              value="{{ valores.get(chave, '') }}"
+              {% if chave == 'email_destinatarios' %}
+              placeholder="email1@exemplo.com, email2@exemplo.com"
+              {% endif %}>
+            {% if chave == 'email_senha' %}
+            <div class="form-text">Use uma senha de app se tiver autenticação de dois fatores ativada.</div>
+            {% elif chave == 'email_destinatarios' %}
+            <div class="form-text">Separe múltiplos e-mails por vírgula.</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Dados do escritório -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-building me-2 text-primary"></i>Dados do escritório</h6>
+        </div>
+        <div class="card-body">
+          {% for chave, label, tipo in campos[3:] %}
+          <div class="mb-3">
+            <label class="form-label fw-medium">{{ label }}</label>
+            <input type="{{ tipo }}" name="{{ chave }}" class="form-control"
+              value="{{ valores.get(chave, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="bi bi-floppy me-1"></i>Salvar configurações
+      </button>
+    </form>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-clock me-2 text-primary"></i>Agendamento automático</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          O sistema executa a busca automaticamente todos os dias às <strong>7h00</strong>, de segunda a sexta.
+        </p>
+        <div class="list-group list-group-flush small">
+          <div class="list-group-item px-0">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>Busca no DOU por todos os termos ativos
+          </div>
+          <div class="list-group-item px-0">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>Salva publicações encontradas no banco
+          </div>
+          <div class="list-group-item px-0">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>Envia e-mail se houver novidades
+          </div>
+          <div class="list-group-item px-0">
+            <i class="bi bi-info-circle-fill text-primary me-2"></i>Evita duplicatas do mesmo dia
+          </div>
+        </div>
+        <div class="alert alert-warning mt-3 small mb-0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          O sistema precisa estar <strong>rodando</strong> para executar automaticamente.
+          Mantenha o <code>run.bat</code> aberto.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

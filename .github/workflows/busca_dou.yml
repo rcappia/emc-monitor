@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependências
-        run: pip install requests
+        run: pip install requests psycopg2-binary
 
       - name: Executar busca no DOU e enviar e-mail
         run: python scripts/buscar_dou.py
@@ -29,3 +29,4 @@ jobs:
           EMAIL_REMETENTE:     ${{ secrets.EMAIL_REMETENTE }}
           EMAIL_SENHA:         ${{ secrets.EMAIL_SENHA }}
           EMAIL_DESTINATARIOS: ${{ secrets.EMAIL_DESTINATARIOS }}
+          DATABASE_URL:        ${{ secrets.DATABASE_URL }}

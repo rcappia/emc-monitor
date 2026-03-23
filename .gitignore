@@ -1,0 +1,9 @@
+emc.db
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+*.egg-info/
+dist/
+build/

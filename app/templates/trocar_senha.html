@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Trocar Senha — EMC Monitor{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-semibold">
+          <i class="bi bi-key me-2 text-warning"></i>
+          {% if usuario.deve_trocar_senha %}Defina sua senha de acesso{% else %}Trocar senha{% endif %}
+        </h6>
+      </div>
+      <div class="card-body p-4">
+        {% if usuario.deve_trocar_senha %}
+        <div class="alert alert-warning small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          Este é seu primeiro acesso. Por segurança, defina uma senha pessoal antes de continuar.
+          <br>A senha inicial é: <strong>emc@2024</strong>
+        </div>
+        {% endif %}
+
+        {% if erro %}
+        <div class="alert alert-danger small">
+          <i class="bi bi-exclamation-circle me-1"></i>{{ erro }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/trocar-senha">
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Senha atual</label>
+            <input type="password" name="senha_atual" class="form-control" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Nova senha</label>
+            <input type="password" name="nova_senha" class="form-control"
+              required minlength="6" placeholder="Mínimo 6 caracteres">
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-medium small">Confirmar nova senha</label>
+            <input type="password" name="confirmar_senha" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-circle me-1"></i>Salvar nova senha
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
