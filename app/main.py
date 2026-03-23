@@ -32,35 +32,34 @@ def tarefa_diaria():
         db.close()
 
 
+def _adicionar_coluna(conn, tabela, coluna, tipo):
+    """Tenta adicionar uma coluna se ela não existir."""
+    try:
+        conn.execute(text(f"SELECT {coluna} FROM {tabela} LIMIT 1"))
+    except Exception:
+        conn.rollback()
+        try:
+            conn.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}"))
+            conn.commit()
+            print(f"Migração: coluna {coluna} adicionada em {tabela}")
+        except Exception:
+            conn.rollback()
+
+
 def migrar_colunas_banco():
     """
     Adiciona colunas novas em tabelas existentes (ALTER TABLE).
     create_all() só cria tabelas novas, não altera as existentes.
     """
     with engine.connect() as conn:
-        # Verifica e adiciona coluna cliente_id em alertas_dou
-        try:
-            conn.execute(text("SELECT cliente_id FROM alertas_dou LIMIT 1"))
-        except Exception:
-            conn.rollback()
-            try:
-                conn.execute(text("ALTER TABLE alertas_dou ADD COLUMN cliente_id INTEGER REFERENCES clientes(id)"))
-                conn.commit()
-                print("Migração: coluna cliente_id adicionada em alertas_dou")
-            except Exception:
-                conn.rollback()
+        # ── Colunas novas em clientes ──
+        _adicionar_coluna(conn, "clientes", "responsavel", "VARCHAR(200) DEFAULT ''")
+        _adicionar_coluna(conn, "clientes", "email", "VARCHAR(200) DEFAULT ''")
+        _adicionar_coluna(conn, "clientes", "celular", "VARCHAR(30) DEFAULT ''")
 
-        # Verifica e adiciona coluna termo_encontrado em alertas_dou
-        try:
-            conn.execute(text("SELECT termo_encontrado FROM alertas_dou LIMIT 1"))
-        except Exception:
-            conn.rollback()
-            try:
-                conn.execute(text("ALTER TABLE alertas_dou ADD COLUMN termo_encontrado VARCHAR(300) DEFAULT ''"))
-                conn.commit()
-                print("Migração: coluna termo_encontrado adicionada em alertas_dou")
-            except Exception:
-                conn.rollback()
+        # ── Colunas novas em alertas_dou ──
+        _adicionar_coluna(conn, "alertas_dou", "cliente_id", "INTEGER REFERENCES clientes(id)")
+        _adicionar_coluna(conn, "alertas_dou", "termo_encontrado", "VARCHAR(300) DEFAULT ''")
 
 
 def migrar_monitorados_para_clientes(db: Session):
@@ -131,11 +130,17 @@ def migrar_monitorados_para_clientes(db: Session):
 async def lifespan(app: FastAPI):
     # Inicializa banco de dados e usuários padrão
     init_db()
-    migrar_colunas_banco()
+    try:
+        migrar_colunas_banco()
+    except Exception as e:
+        print(f"Aviso migração de colunas: {e}")
     db = SessionLocal()
     try:
         criar_usuarios_iniciais(db)
-        migrar_monitorados_para_clientes(db)
+        try:
+            migrar_monitorados_para_clientes(db)
+        except Exception as e:
+            print(f"Aviso migração monitorados→clientes: {e}")
     finally:
         db.close()
 
