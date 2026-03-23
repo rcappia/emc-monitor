@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import date
 from app.database import get_db
 from app.models import Monitorado, AlertaDOU, Configuracao
@@ -16,6 +16,7 @@ templates = Jinja2Templates(directory="app/templates")
 def listar(request: Request, db: Session = Depends(get_db)):
     alertas = (
         db.query(AlertaDOU)
+        .options(joinedload(AlertaDOU.cliente))
         .order_by(AlertaDOU.encontrado_em.desc())
         .limit(100)
         .all()

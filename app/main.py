@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime
 
 from sqlalchemy import text
@@ -209,6 +209,7 @@ def dashboard(request: Request):
         )
         alertas_recentes = (
             db.query(AlertaDOU)
+            .options(joinedload(AlertaDOU.cliente))
             .order_by(AlertaDOU.encontrado_em.desc())
             .limit(10)
             .all()
