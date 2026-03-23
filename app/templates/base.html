@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="/static/style.css?v=3" rel="stylesheet">
+  <link href="/static/style.css?v=4" rel="stylesheet">
 
   <!-- Aplica o tema antes de renderizar para evitar piscar -->
   <script>
@@ -23,10 +23,24 @@
 </head>
 <body>
 
+<!-- ── Barra mobile (aparece só no celular) ──── -->
+<div class="mobile-header">
+  <button class="hamburger" id="menuToggle" aria-label="Abrir menu">
+    <i class="bi bi-list"></i>
+  </button>
+  <a href="/" class="mobile-header-brand">
+    <i class="bi bi-broadcast-pin"></i>
+    EMC Monitor
+  </a>
+</div>
+
+<!-- ── Overlay escuro (mobile) ──── -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
 <div class="app-layout">
 
   <!-- ── Sidebar ─────────────────────────────── -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
 
     <a href="/" class="sidebar-brand">
       <i class="bi bi-broadcast-pin"></i>
@@ -64,7 +78,6 @@
         {{ usuario_atual.nome.split()[0] }}
       </div>
       <div class="d-flex align-items-center gap-2">
-        <!-- Botão modo claro/escuro -->
         <button class="theme-toggle" id="themeToggle" title="Alternar modo claro/escuro">
           <i class="bi bi-moon-fill" id="themeIcon"></i>
         </button>
@@ -88,39 +101,48 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+  // ── Menu mobile ──────────────────────────────
+  var menuBtn   = document.getElementById('menuToggle');
+  var sidebar   = document.getElementById('sidebar');
+  var overlay   = document.getElementById('sidebarOverlay');
+
+  function openMenu()  { sidebar.classList.add('open');    overlay.classList.add('active'); }
+  function closeMenu()  { sidebar.classList.remove('open'); overlay.classList.remove('active'); }
+
+  if (menuBtn) menuBtn.addEventListener('click', function () {
+    sidebar.classList.contains('open') ? closeMenu() : openMenu();
+  });
+  if (overlay) overlay.addEventListener('click', closeMenu);
+
+  // Fecha menu ao clicar em um link (mobile)
+  sidebar.querySelectorAll('.sidebar-link').forEach(function (link) {
+    link.addEventListener('click', closeMenu);
+  });
+
   // ── Gerenciamento de tema ─────────────────────
-  const html      = document.documentElement;
-  const btn       = document.getElementById('themeToggle');
-  const icon      = document.getElementById('themeIcon');
+  var html = document.documentElement;
+  var btn  = document.getElementById('themeToggle');
+  var icon = document.getElementById('themeIcon');
 
   function applyTheme(theme) {
     html.setAttribute('data-theme', theme);
     localStorage.setItem('emc-theme', theme);
-    if (icon) {
-      icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
-    }
+    if (icon) icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
   }
 
   // Aplica ícone correto ao carregar
   var currentTheme = html.getAttribute('data-theme') || 'light';
-  if (icon) {
-    icon.className = currentTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
-  }
+  if (icon) icon.className = currentTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
 
   // Toggle ao clicar
-  if (btn) {
-    btn.addEventListener('click', function () {
-      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
-    });
-  }
+  if (btn) btn.addEventListener('click', function () {
+    var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+  });
 
-  // Reage a mudanças na preferência do sistema (ex: Windows/macOS muda automaticamente)
+  // Reage a mudanças na preferência do sistema
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-    // Só muda automaticamente se o usuário não escolheu manualmente
-    if (!localStorage.getItem('emc-theme')) {
-      applyTheme(e.matches ? 'dark' : 'light');
-    }
+    if (!localStorage.getItem('emc-theme')) applyTheme(e.matches ? 'dark' : 'light');
   });
 </script>
 
