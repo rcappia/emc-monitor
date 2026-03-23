@@ -45,7 +45,7 @@ class AlertaDOU(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     cliente_id: Mapped[int] = mapped_column(Integer, ForeignKey("clientes.id"), nullable=True)
     # campo legado — manter para não quebrar registros antigos
-    monitorado_id: Mapped[int] = mapped_column(Integer, ForeignKey("monitorados.id", ondelete="SET NULL"), nullable=True)
+    monitorado_id: Mapped[int] = mapped_column(Integer, nullable=True)
     data_publicacao: Mapped[str] = mapped_column(String(20))
     secao: Mapped[str] = mapped_column(String(10))
     titulo: Mapped[str] = mapped_column(String(500))
@@ -71,7 +71,6 @@ class Monitorado(Base):
     tipo: Mapped[str] = mapped_column(String(50), default="nome")
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    cliente_id: Mapped[int] = mapped_column(Integer, ForeignKey("clientes.id"), nullable=True)
 
 
 class Usuario(Base):

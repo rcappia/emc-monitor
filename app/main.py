@@ -11,7 +11,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 
-from app.database import init_db, SessionLocal
+from sqlalchemy import text
+
+from app.database import init_db, SessionLocal, engine
 from app.models import AlertaDOU, Monitorado, Cliente, ProcessoCliente
 from app.routers import monitorados, alertas, configuracoes, clientes
 from app.routers.alertas import _executar_busca
@@ -30,6 +32,37 @@ def tarefa_diaria():
         db.close()
 
 
+def migrar_colunas_banco():
+    """
+    Adiciona colunas novas em tabelas existentes (ALTER TABLE).
+    create_all() só cria tabelas novas, não altera as existentes.
+    """
+    with engine.connect() as conn:
+        # Verifica e adiciona coluna cliente_id em alertas_dou
+        try:
+            conn.execute(text("SELECT cliente_id FROM alertas_dou LIMIT 1"))
+        except Exception:
+            conn.rollback()
+            try:
+                conn.execute(text("ALTER TABLE alertas_dou ADD COLUMN cliente_id INTEGER REFERENCES clientes(id)"))
+                conn.commit()
+                print("Migração: coluna cliente_id adicionada em alertas_dou")
+            except Exception:
+                conn.rollback()
+
+        # Verifica e adiciona coluna termo_encontrado em alertas_dou
+        try:
+            conn.execute(text("SELECT termo_encontrado FROM alertas_dou LIMIT 1"))
+        except Exception:
+            conn.rollback()
+            try:
+                conn.execute(text("ALTER TABLE alertas_dou ADD COLUMN termo_encontrado VARCHAR(300) DEFAULT ''"))
+                conn.commit()
+                print("Migração: coluna termo_encontrado adicionada em alertas_dou")
+            except Exception:
+                conn.rollback()
+
+
 def migrar_monitorados_para_clientes(db: Session):
     """
     Migração automática:
@@ -37,7 +70,11 @@ def migrar_monitorados_para_clientes(db: Session):
     2. Cria ProcessoCliente para cada monitorado tipo 'processo'
     3. Vincula alertas antigos (que tem monitorado_id) ao cliente correspondente
     """
-    orfaos = db.query(Monitorado).all()
+    try:
+        orfaos = db.query(Monitorado).all()
+    except Exception as e:
+        print(f"Aviso: tabela monitorados não acessível ({e}). Migração ignorada.")
+        return
     if not orfaos:
         return
 
@@ -94,6 +131,7 @@ def migrar_monitorados_para_clientes(db: Session):
 async def lifespan(app: FastAPI):
     # Inicializa banco de dados e usuários padrão
     init_db()
+    migrar_colunas_banco()
     db = SessionLocal()
     try:
         criar_usuarios_iniciais(db)
