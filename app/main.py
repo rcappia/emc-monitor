@@ -130,21 +130,44 @@ def migrar_monitorados_para_clientes(db: Session):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicializa banco de dados e usuários padrão
-    init_db()
+    # Preparação do banco.
+    #
+    # Tudo aqui é tolerante a falha DE PROPÓSITO. Antes, um banco inacessível
+    # derrubava a aplicação inteira na inicialização — no Render virava
+    # crash-loop, e na Vercel um "FUNCTION_INVOCATION_FAILED" sem explicação.
+    # Em nenhum dos dois casos dava para saber o que havia acontecido sem ler
+    # o log do servidor.
+    #
+    # Com o tratamento abaixo a aplicação sobe assim mesmo: o erro aparece no
+    # log de forma legível e as páginas respondem, em vez de a aplicação
+    # simplesmente não existir.
+    try:
+        init_db()
+    except Exception as e:
+        print("=" * 72)
+        print("[ERRO] Não foi possível preparar o banco de dados.")
+        print(f"  Motivo: {e}")
+        print("  Verifique se a variável de ambiente DATABASE_URL está")
+        print("  configurada e se o banco (Supabase) não está pausado.")
+        print("=" * 72)
+
     try:
         migrar_colunas_banco()
     except Exception as e:
         print(f"Aviso migração de colunas: {e}")
-    db = SessionLocal()
+
     try:
-        criar_usuarios_iniciais(db)
+        db = SessionLocal()
         try:
-            migrar_monitorados_para_clientes(db)
-        except Exception as e:
-            print(f"Aviso migração monitorados→clientes: {e}")
-    finally:
-        db.close()
+            criar_usuarios_iniciais(db)
+            try:
+                migrar_monitorados_para_clientes(db)
+            except Exception as e:
+                print(f"Aviso migração monitorados→clientes: {e}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[ERRO] Falha ao inicializar usuários: {e}")
 
     # Agendador interno: segunda a sexta às 6h00.
     #
