@@ -7,6 +7,15 @@ on:
     # em horários de pico. Por isso o cron roda um pouco antes do necessário.
     - cron: '0 9 * * 1-5'   # segunda a sexta
   workflow_dispatch:          # permite disparar manualmente pelo GitHub
+    inputs:
+      modo:
+        description: 'O que executar'
+        required: true
+        default: 'busca_completa'
+        type: choice
+        options:
+          - busca_completa   # busca real no DOU (~25 min) e envia alertas
+          - autoteste        # so verifica banco, INLABS e e-mail (~1 min)
 
 # Necessário para o passo de keep-alive conseguir fazer push.
 permissions:
@@ -30,7 +39,14 @@ jobs:
         run: pip install requests==2.32.3 psycopg2-binary==2.9.9
 
       - name: Executar busca no DOU e enviar e-mail
-        run: python scripts/buscar_dou.py
+        # No modo 'autoteste' o script apenas verifica banco, INLABS e envio de
+        # e-mail (cerca de 1 minuto) em vez de rodar a busca inteira.
+        run: |
+          if [ "${{ github.event.inputs.modo }}" = "autoteste" ]; then
+            python scripts/buscar_dou.py --autoteste
+          else
+            python scripts/buscar_dou.py
+          fi
         env:
           INLABS_EMAIL:        ${{ secrets.INLABS_EMAIL }}
           INLABS_SENHA:        ${{ secrets.INLABS_SENHA }}

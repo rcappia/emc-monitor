@@ -10,6 +10,7 @@ Caso contrário, lê de clientes.json (modo local/fallback).
 import io
 import json
 import os
+import sys
 import re
 import smtplib
 import unicodedata
@@ -642,7 +643,96 @@ def _registrar_busca_log(total_encontrados: int, sucesso: bool, observacao: str)
         print(f"[AVISO] Falha ao registrar log de busca: {exc}")
 
 
+def autoteste() -> int:
+    """
+    Verificação do sistema sem fazer a busca completa (que leva ~25 minutos).
+
+    Confere, em ordem, as três coisas que precisam funcionar para o alerta
+    chegar na caixa de entrada:
+      1. o banco de dados responde e a lista de clientes está lá;
+      2. o login no INLABS (assinatura do Diário Oficial) funciona;
+      3. o envio de e-mail funciona de verdade — manda uma mensagem de teste.
+
+    Retorna 0 se está tudo certo, 1 se alguma etapa falhou.
+    """
+    print("=" * 72)
+    print("AUTOTESTE DO EMC MONITOR")
+    print("=" * 72)
+    problemas = []
+
+    # 1. Banco de dados e lista de clientes
+    print("\n[1/3] Banco de dados e lista de clientes")
+    clientes = _carregar_clientes()
+    if MODO_DEGRADADO:
+        problemas.append(f"banco de dados nao respondeu ({MOTIVO_DEGRADACAO})")
+        print(f"      FALHOU — usando copia local com {len(clientes)} cliente(s)")
+    else:
+        print(f"      OK — {len(clientes)} termo(s) carregado(s) do banco")
+        if len(clientes) < 50:
+            problemas.append(
+                f"apenas {len(clientes)} clientes carregados — esperado ~103"
+            )
+
+    # 2. Login no INLABS
+    print("\n[2/3] Acesso ao Diario Oficial (INLABS)")
+    try:
+        sessao = login_inlabs()
+        cookie = sessao.cookies.get("inlabs_session_cookie", "")
+        if cookie:
+            print("      OK — login realizado")
+        else:
+            problemas.append("login no INLABS falhou (usuario ou senha)")
+            print("      FALHOU — sem cookie de sessao")
+    except Exception as exc:
+        problemas.append(f"erro ao acessar o INLABS: {exc}")
+        print(f"      FALHOU — {exc}")
+
+    # 3. Envio de e-mail — exercita o caminho real, com uma publicacao ficticia
+    print("\n[3/3] Envio de e-mail")
+    print(f"      Destinatarios: {', '.join(EMAIL_DESTINATARIOS)}")
+    exemplo = [{
+        "nome_cliente": "TESTE DO SISTEMA — nenhum cliente real",
+        "tipo": "nome",
+        "termo_busca": "teste",
+        "secao": "DO1",
+        "titulo": "Mensagem de teste do EMC Monitor",
+        "data_publicacao": date.today().strftime("%d/%m/%Y"),
+        "paragrafo": (
+            "Esta e uma mensagem de teste enviada manualmente para verificar "
+            "se o sistema de alertas esta funcionando. Nenhuma publicacao real "
+            "do Diario Oficial foi encontrada. RESOLVE: se voce recebeu este "
+            "e-mail, o envio de alertas esta operacional. Art. 1o Nenhuma acao "
+            "e necessaria da sua parte."
+        ),
+        "url": "https://www.in.gov.br/",
+    }]
+    if enviar_email(exemplo):
+        print("      OK — e-mail de teste enviado")
+    else:
+        problemas.append(f"envio de e-mail falhou: {ULTIMO_ERRO_EMAIL}")
+        print(f"      FALHOU — {ULTIMO_ERRO_EMAIL}")
+
+    # Resultado
+    print("\n" + "=" * 72)
+    if problemas:
+        print(f"AUTOTESTE FALHOU — {len(problemas)} problema(s):")
+        for p in problemas:
+            print(f"  - {p}")
+        print("=" * 72)
+        _registrar_busca_log(0, False, f"Autoteste falhou: {'; '.join(problemas)}")
+        return 1
+
+    print("AUTOTESTE PASSOU — banco, Diario Oficial e e-mail estao funcionando.")
+    print("Confira a caixa de entrada: deve ter chegado um e-mail de teste.")
+    print("=" * 72)
+    _registrar_busca_log(0, True, "Autoteste do sistema: banco, INLABS e e-mail OK.")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--autoteste" in sys.argv:
+        sys.exit(autoteste())
+
     hoje = date.today()
     print(f"EMC Monitor — Busca DOU {hoje.strftime('%d/%m/%Y')}")
     print(f"Dia da semana: {hoje.strftime('%A')}")
