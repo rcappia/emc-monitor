@@ -2,6 +2,7 @@
 Aplicação principal do EMC Monitor.
 Inicia o servidor web, o banco de dados e o agendamento automático.
 """
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -145,15 +146,31 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # Inicia agendador: busca DOU toda segunda a sexta às 7h
-    scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
-    scheduler.add_job(tarefa_diaria, "cron", day_of_week="mon-fri", hour=6, minute=0)
-    scheduler.start()
-    print("Agendador iniciado — busca DOU: segunda a sexta às 6h00")
+    # Agendador interno: segunda a sexta às 6h00.
+    #
+    # Este agendador NUNCA foi confiável e não deve ser tratado como reserva do
+    # GitHub Actions: ele só dispara se o processo estiver de pé às 6h00, e tanto
+    # o plano gratuito do Render quanto a Vercel derrubam o processo quando não há
+    # acesso. Quem de fato garante a busca diária é o GitHub Actions
+    # (.github/workflows/busca_dou.yml).
+    #
+    # Em ambientes serverless (Vercel) ele é desligado explicitamente, porque lá
+    # não existe processo em segundo plano — ficaria apenas consumindo memória.
+    scheduler = None
+    if os.environ.get("EMC_SEM_AGENDADOR") == "1":
+        print("Agendador interno desligado (ambiente serverless).")
+        print("A busca diária é feita pelo GitHub Actions.")
+    else:
+        scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
+        scheduler.add_job(tarefa_diaria, "cron", day_of_week="mon-fri", hour=6, minute=0)
+        scheduler.start()
+        print("Agendador interno iniciado — busca DOU: segunda a sexta às 6h00")
+        print("(reserva apenas; a busca garantida é a do GitHub Actions)")
 
     yield
 
-    scheduler.shutdown()
+    if scheduler is not None:
+        scheduler.shutdown()
 
 
 app = FastAPI(title="EMC Monitor", lifespan=lifespan)

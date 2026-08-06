@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "includeFiles": "{app/**,static/**,clientes.json}"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "api/index.py" },
+    { "src": "/(.*)", "dest": "api/index.py" }
+  ]
+}
