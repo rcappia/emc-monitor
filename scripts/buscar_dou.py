@@ -28,6 +28,13 @@ INLABS_SENHA = os.environ["INLABS_SENHA"]
 EMAIL_REMETENTE = os.environ["EMAIL_REMETENTE"]
 EMAIL_SENHA = os.environ["EMAIL_SENHA"]
 EMAIL_DESTINATARIOS = [e.strip() for e in os.environ["EMAIL_DESTINATARIOS"].split(",") if e.strip()]
+if not EMAIL_DESTINATARIOS:
+    # Sem esta checagem, uma lista vazia ou mal formatada faria o robô rodar
+    # a busca inteira e "enviar" para ninguém, terminando em verde.
+    raise SystemExit(
+        "ERRO: EMAIL_DESTINATARIOS está vazio ou mal formatado. "
+        "Configure o secret com um ou mais e-mails separados por vírgula."
+    )
 
 # ── Banco de dados (opcional — Supabase em produção) ──────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -49,6 +56,16 @@ SMTP_PORT = 587
 # falhar (vermelho no GitHub), em vez de passar despercebida.
 MODO_DEGRADADO = False
 MOTIVO_DEGRADACAO = ""
+
+# Guarda o erro real do servidor de e-mail. Sem isso, uma recusa de login do
+# Gmail (senha de aplicativo revogada, por exemplo) só aparecia no texto do
+# run e nunca chegava ao histórico do painel.
+ULTIMO_ERRO_EMAIL = ""
+
+# Conta falhas de leitura do DOU. Sem isso, o INLABS fora do ar produzia
+# exatamente o mesmo resultado de um dia sem publicações: zero alertas,
+# nenhum e-mail e run verde.
+SECOES_COM_FALHA: list[str] = []
 
 
 # ── Clientes: banco ou arquivo ────────────────────────────────────────────────
@@ -137,10 +154,15 @@ def _salvar_alerta_db(cliente_id: int, resultado: dict):
         )
         if not cur.fetchone():
             cur.execute(
+                # email_enviado entra como FALSE: o alerta acabou de ser
+                # encontrado e o e-mail ainda nem foi tentado. Só vira TRUE
+                # em _marcar_alertas_enviados(), depois do envio confirmado.
+                # Antes era gravado TRUE aqui, então o painel exibia
+                # "e-mail enviado" mesmo quando nenhum e-mail saía.
                 """INSERT INTO alertas_dou
                    (cliente_id, data_publicacao, secao, titulo, resumo, paragrafo, url,
                     termo_encontrado, email_enviado, encontrado_em)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)""",
                 (
                     cliente_id,
                     resultado["data_publicacao"],
@@ -267,6 +289,41 @@ def buscar_em_xml(xml_bytes: bytes, termo: str, secao: str) -> list[dict]:
     return resultados
 
 
+def _marcar_alertas_enviados():
+    """
+    Marca como enviados os alertas desta execução, depois que o e-mail saiu
+    de fato. Chamado apenas quando enviar_email() retorna True.
+    """
+    if not DATABASE_URL:
+        return
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=15)
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE alertas_dou SET email_enviado = TRUE "
+            "WHERE email_enviado = FALSE AND encontrado_em::date = CURRENT_DATE"
+        )
+        atualizados = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"Marcados como enviados: {atualizados} alerta(s).")
+    except Exception as exc:
+        print(f"[AVISO] Falha ao marcar alertas como enviados: {exc}")
+
+
+def _marcar_falha_secao(secao: str, motivo: str):
+    """
+    Registra, uma única vez por seção, que ela não pôde ser lida.
+
+    Como cada seção é baixada uma vez por cliente (103 vezes), sem essa
+    deduplicação a mesma falha apareceria centenas de vezes no aviso.
+    """
+    if not any(f.startswith(secao) for f in SECOES_COM_FALHA):
+        SECOES_COM_FALHA.append(f"{secao} ({motivo})")
+
+
 def buscar_hoje(session: requests.Session) -> list[dict]:
     hoje = date.today().strftime("%Y-%m-%d")
     cookie = session.cookies.get("inlabs_session_cookie", "")
@@ -282,7 +339,7 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
         cliente_id = cliente.get("id")
         print(f"  Buscando: {nome}...", end=" ", flush=True)
         encontrados = []
-        for secao in SECOES:
+        for secao in SECOES:  # noqa: PLR1702
             url = f"{URL_BASE}{hoje}&dl={hoje}-{secao}.zip"
             try:
                 resp = session.get(
@@ -291,6 +348,12 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
                     timeout=60,
                 )
                 if resp.status_code != 200:
+                    # 404 é esperado: em feriado ou fim de semana a seção
+                    # simplesmente não é publicada. Qualquer outro código
+                    # indica problema de acesso ao DOU, e aí a busca do dia
+                    # não pode ser considerada completa.
+                    if resp.status_code != 404:
+                        _marcar_falha_secao(secao, f"HTTP {resp.status_code}")
                     continue
                 with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
                     for nome_arq in zf.namelist():
@@ -307,6 +370,7 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
                             _salvar_alerta_db(cliente_id, item)
             except Exception as exc:
                 print(f"\n  [AVISO] Erro em {secao}: {exc}")
+                _marcar_falha_secao(secao, type(exc).__name__)
         print(f"{len(encontrados)} resultado(s)")
         todos.extend(encontrados)
     return todos
@@ -446,13 +510,17 @@ def enviar_email(alertas: list[dict]) -> bool:
         msg["To"] = ", ".join(EMAIL_DESTINATARIOS)
         msg.attach(MIMEText("\n".join(linhas_txt), "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as srv:
+        # timeout obrigatório: sem ele, uma conexão travada pendura o robô
+        # até o limite do GitHub Actions (horas), sem enviar nada.
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as srv:
             srv.ehlo()
             srv.starttls()
             srv.login(EMAIL_REMETENTE, EMAIL_SENHA)
             srv.sendmail(EMAIL_REMETENTE, EMAIL_DESTINATARIOS, msg.as_string())
         return True
     except Exception as exc:
+        global ULTIMO_ERRO_EMAIL
+        ULTIMO_ERRO_EMAIL = f"{type(exc).__name__}: {exc}"
         print(f"ERRO ao enviar e-mail: {exc}")
         return False
 
@@ -466,15 +534,35 @@ def enviar_aviso_falha() -> bool:
     hoje = date.today().strftime("%d/%m/%Y")
     assunto = f"[!] [EMC Monitor] Sistema em emergência — {hoje}"
 
+    if MODO_DEGRADADO:
+        titulo_falha = "O banco de dados não respondeu"
+        detalhe = MOTIVO_DEGRADACAO
+        explicacao_html = (
+            "A busca no Diário Oficial foi feita normalmente e "
+            "<strong>nenhuma publicação</strong> foi encontrada.<br><br>"
+            "Porém o banco de dados está fora do ar. Por isso a lista de clientes "
+            "usada foi a <strong>cópia local de segurança</strong>, que pode não "
+            "refletir o cadastro atual."
+        )
+        providencia = "restabelecer o banco de dados."
+    else:
+        titulo_falha = "Parte do Diário Oficial não pôde ser lida"
+        detalhe = ", ".join(SECOES_COM_FALHA)
+        explicacao_html = (
+            "A busca foi executada, mas <strong>uma ou mais seções do Diário "
+            "Oficial não puderam ser baixadas</strong>.<br><br>"
+            "Nenhuma publicação foi encontrada nas seções que funcionaram — mas "
+            "como parte do Diário não foi lida, <strong>pode haver publicações "
+            "não detectadas hoje</strong>."
+        )
+        providencia = "verificar manualmente o Diário Oficial de hoje."
+
     texto = (
         f"EMC Monitor — aviso de falha ({hoje})\n"
         f"{'=' * 60}\n\n"
-        "A busca no DOU foi realizada, mas o BANCO DE DADOS NAO RESPONDEU.\n\n"
-        f"Motivo tecnico: {MOTIVO_DEGRADACAO}\n\n"
-        "Nenhuma publicacao foi encontrada hoje para os clientes monitorados.\n"
-        "Porem, como o banco esta fora do ar, a lista de clientes usada foi a\n"
-        "copia local de seguranca, que pode estar desatualizada.\n\n"
-        "E preciso restabelecer o banco de dados.\n"
+        f"{titulo_falha.upper()}\n\n"
+        f"Detalhe tecnico: {detalhe}\n\n"
+        f"Providencia: {providencia}\n"
     )
 
     html = f"""<html>
@@ -489,20 +577,18 @@ def enviar_aviso_falha() -> bool:
         </div>
         <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;padding:24px 28px;">
           <div style="font-size:15px;font-weight:700;color:#b91c1c;margin-bottom:12px;">
-            ⚠️ O banco de dados não respondeu
+            ⚠️ {titulo_falha}
           </div>
           <div style="font-size:13.5px;color:#374151;line-height:1.75;">
-            A busca no Diário Oficial foi feita normalmente em <strong>{hoje}</strong> e
-            <strong>nenhuma publicação</strong> foi encontrada para os clientes monitorados.<br><br>
-            Porém o banco de dados está fora do ar. Por isso a lista de clientes usada foi a
-            <strong>cópia local de segurança</strong>, que pode não refletir o cadastro atual.<br><br>
+            Data da busca: <strong>{hoje}</strong>.<br><br>
+            {explicacao_html}<br><br>
             Você está recebendo este aviso para que um dia sem publicações não seja
             confundido com um sistema quebrado.<br><br>
-            <strong>Providência:</strong> restabelecer o banco de dados.
+            <strong>Providência:</strong> {providencia}
           </div>
           <div style="background:#f8fafc;border-left:4px solid #dc2626;padding:12px 16px;border-radius:0 8px 8px 0;margin-top:18px;">
             <div style="font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Detalhe técnico</div>
-            <div style="font-size:12px;color:#6b7280;font-family:monospace;word-break:break-all;">{MOTIVO_DEGRADACAO}</div>
+            <div style="font-size:12px;color:#6b7280;font-family:monospace;word-break:break-all;">{detalhe}</div>
           </div>
         </div>
         <div style="text-align:center;padding:14px 0 24px;">
@@ -518,13 +604,17 @@ def enviar_aviso_falha() -> bool:
         msg["To"] = ", ".join(EMAIL_DESTINATARIOS)
         msg.attach(MIMEText(texto, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as srv:
+        # timeout obrigatório: sem ele, uma conexão travada pendura o robô
+        # até o limite do GitHub Actions (horas), sem enviar nada.
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as srv:
             srv.ehlo()
             srv.starttls()
             srv.login(EMAIL_REMETENTE, EMAIL_SENHA)
             srv.sendmail(EMAIL_REMETENTE, EMAIL_DESTINATARIOS, msg.as_string())
         return True
     except Exception as exc:
+        global ULTIMO_ERRO_EMAIL
+        ULTIMO_ERRO_EMAIL = f"{type(exc).__name__}: {exc}"
         print(f"ERRO ao enviar aviso de falha: {exc}")
         return False
 
@@ -571,28 +661,45 @@ if __name__ == "__main__":
 
     print(f"\nTotal encontrado: {len(alertas)} publicação(ões)")
 
-    # Registra a busca no histórico
-    _registrar_busca_log(
-        total_encontrados=len(alertas),
-        sucesso=not MODO_DEGRADADO,
-        observacao=(
-            f"MODO DE EMERGÊNCIA (banco fora do ar): {MOTIVO_DEGRADACAO}"
-            if MODO_DEGRADADO
-            else f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
-        ),
-    )
+    if SECOES_COM_FALHA:
+        print(f"[ATENÇÃO] {len(SECOES_COM_FALHA)} seção(ões) do DOU não puderam "
+              f"ser lidas: {', '.join(SECOES_COM_FALHA)}")
 
+    # O envio vem ANTES do registro no histórico, de propósito.
+    # Antes o log era gravado com sucesso=True antes de tentar enviar: se o
+    # Gmail recusasse o envio, o painel mostrava a busca como bem-sucedida e
+    # o erro real desaparecia.
     email_ok = True
     if alertas:
         print("Enviando e-mail...")
         email_ok = enviar_email(alertas)
         print("E-mail:", "ENVIADO" if email_ok else "FALHOU")
-    elif MODO_DEGRADADO:
-        print("Nenhuma publicação hoje, mas o banco está fora do ar — enviando aviso.")
+        if email_ok:
+            _marcar_alertas_enviados()
+    elif MODO_DEGRADADO or SECOES_COM_FALHA:
+        print("Nenhuma publicação encontrada, mas houve falha no sistema — enviando aviso.")
         email_ok = enviar_aviso_falha()
         print("E-mail de aviso:", "ENVIADO" if email_ok else "FALHOU")
     else:
         print("Nenhum cliente apareceu no DOU hoje — nenhum e-mail enviado.")
+
+    # Agora sim, o histórico registra o que realmente aconteceu.
+    tudo_certo = (not MODO_DEGRADADO) and email_ok and not SECOES_COM_FALHA
+    if not email_ok:
+        observacao = f"FALHA NO ENVIO DO E-MAIL: {ULTIMO_ERRO_EMAIL}"
+    elif MODO_DEGRADADO:
+        observacao = f"MODO DE EMERGÊNCIA (banco fora do ar): {MOTIVO_DEGRADACAO}"
+    elif SECOES_COM_FALHA:
+        observacao = ("Busca incompleta — não foi possível ler: "
+                      f"{', '.join(SECOES_COM_FALHA)}")
+    else:
+        observacao = f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
+
+    _registrar_busca_log(
+        total_encontrados=len(alertas),
+        sucesso=tudo_certo,
+        observacao=observacao,
+    )
 
     # O run precisa ficar VERMELHO no GitHub quando algo deu errado.
     # Antes, uma falha de envio ou de banco terminava com código 0 (verde),
@@ -603,4 +710,10 @@ if __name__ == "__main__":
         exit(1)
     if not email_ok:
         print("\n[FALHA] A busca funcionou, mas o e-mail não pôde ser enviado.")
+        print(f"        Erro do servidor de e-mail: {ULTIMO_ERRO_EMAIL}")
+        exit(1)
+    if SECOES_COM_FALHA:
+        print(f"\n[FALHA] A busca foi incompleta: não foi possível ler "
+              f"{', '.join(SECOES_COM_FALHA)} do DOU.")
+        print("        Pode haver publicações não detectadas hoje.")
         exit(1)
