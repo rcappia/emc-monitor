@@ -77,6 +77,11 @@ ULTIMO_ERRO_EMAIL = ""
 SECOES_COM_FALHA: list[str] = []
 SECOES_INDISPONIVEIS: list[str] = []
 
+# O INLABS (sistema do governo) entra em manutenção de vez em quando.
+# É indisponibilidade externa, não defeito do EMC Monitor — mas precisa
+# aparecer, porque durante a manutenção nada é verificado.
+INLABS_EM_MANUTENCAO = False
+
 
 def hoje_brasil() -> date:
     """
@@ -241,10 +246,19 @@ def login_inlabs(tentativas: int = 3) -> requests.Session:
                 timeout=30,
             )
             # Diagnóstico: sem isso, "login falhou" não distingue senha
-            # errada de bloqueio temporário por excesso de acessos.
+            # errada de manutenção do sistema do governo.
             if not s.cookies.get("inlabs_session_cookie", ""):
-                corpo = (resp.text or "")[:200].replace("\n", " ").strip()
-                print(f"  [DIAGNÓSTICO] HTTP {resp.status_code} — resposta: {corpo!r}")
+                corpo = (resp.text or "")
+                if "manuten" in corpo.lower() or resp.status_code in (502, 503):
+                    global INLABS_EM_MANUTENCAO
+                    INLABS_EM_MANUTENCAO = True
+                    print("  O INLABS (sistema do governo que publica o Diário "
+                          "Oficial) está EM MANUTENÇÃO no momento.")
+                    print(f"  Isso é uma indisponibilidade do próprio governo "
+                          f"(HTTP {resp.status_code}), não um problema do EMC Monitor.")
+                else:
+                    trecho = corpo[:200].replace("\n", " ").strip()
+                    print(f"  [DIAGNÓSTICO] HTTP {resp.status_code} — resposta: {trecho!r}")
             break
         except requests.RequestException as exc:
             print(f"  [AVISO] Tentativa {tentativa}/{tentativas} de login "
@@ -868,7 +882,13 @@ if __name__ == "__main__":
     cookie = session.cookies.get("inlabs_session_cookie", "")
     print(f"Login INLABS: {'OK' if cookie else 'FALHOU'}")
     if not cookie:
-        _registrar_busca_log(0, False, "Falha no login INLABS")
+        _registrar_busca_log(
+            0, False,
+            "Diário Oficial (INLABS) em manutenção — indisponibilidade do "
+            "governo, nada pôde ser verificado hoje."
+            if INLABS_EM_MANUTENCAO
+            else "Falha no login INLABS — verificar usuário e senha."
+        )
         exit(1)
 
     print(f"\nBuscando {len(CLIENTES)} clientes no DOU...")
