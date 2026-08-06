@@ -234,12 +234,17 @@ def login_inlabs(tentativas: int = 3) -> requests.Session:
     s = requests.Session()
     for tentativa in range(1, tentativas + 1):
         try:
-            s.post(
+            resp = s.post(
                 URL_LOGIN,
                 data={"email": INLABS_EMAIL, "password": INLABS_SENHA},
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=30,
             )
+            # Diagnóstico: sem isso, "login falhou" não distingue senha
+            # errada de bloqueio temporário por excesso de acessos.
+            if not s.cookies.get("inlabs_session_cookie", ""):
+                corpo = (resp.text or "")[:200].replace("\n", " ").strip()
+                print(f"  [DIAGNÓSTICO] HTTP {resp.status_code} — resposta: {corpo!r}")
             break
         except requests.RequestException as exc:
             print(f"  [AVISO] Tentativa {tentativa}/{tentativas} de login "
