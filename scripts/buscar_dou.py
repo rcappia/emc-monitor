@@ -13,6 +13,7 @@ import os
 import sys
 import re
 import smtplib
+import time
 import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
@@ -221,14 +222,32 @@ CLIENTES = _carregar_clientes()
 
 # ── INLABS ────────────────────────────────────────────────────────────────────
 
-def login_inlabs() -> requests.Session:
+def login_inlabs(tentativas: int = 3) -> requests.Session:
+    """
+    Faz login no INLABS, com novas tentativas em caso de falha de rede.
+
+    O servidor do INLABS às vezes derruba a conexão ("RemoteDisconnected"),
+    sobretudo em horário de pico. Antes isso encerrava o robô com um erro
+    técnico e a busca do dia inteiro se perdia por causa de uma oscilação
+    de alguns segundos.
+    """
     s = requests.Session()
-    s.post(
-        URL_LOGIN,
-        data={"email": INLABS_EMAIL, "password": INLABS_SENHA},
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        timeout=30,
-    )
+    for tentativa in range(1, tentativas + 1):
+        try:
+            s.post(
+                URL_LOGIN,
+                data={"email": INLABS_EMAIL, "password": INLABS_SENHA},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=30,
+            )
+            break
+        except requests.RequestException as exc:
+            print(f"  [AVISO] Tentativa {tentativa}/{tentativas} de login "
+                  f"falhou: {type(exc).__name__}")
+            if tentativa == tentativas:
+                print("  Não foi possível conectar ao INLABS.")
+                return s
+            time.sleep(10 * tentativa)   # 10s, depois 20s
     return s
 
 
@@ -374,11 +393,26 @@ def _baixar_secao(session: requests.Session, cookie: str, dia: str, secao: str) 
     """
     url = f"{URL_BASE}{dia}&dl={dia}-{secao}.zip"
     try:
-        resp = session.get(
-            url,
-            headers={"Cookie": f"inlabs_session_cookie={cookie}", "origem": "736372697074"},
-            timeout=60,
-        )
+        # Tenta até 3 vezes: o INLABS derruba conexões esporadicamente, e
+        # perder uma seção inteira por causa disso significa perder
+        # publicações sem saber.
+        resp = None
+        for tentativa in range(1, 4):
+            try:
+                resp = session.get(
+                    url,
+                    headers={"Cookie": f"inlabs_session_cookie={cookie}",
+                             "origem": "736372697074"},
+                    timeout=60,
+                )
+                break
+            except requests.RequestException as exc:
+                print(f"  [AVISO] {secao}: tentativa {tentativa}/3 falhou "
+                      f"({type(exc).__name__})")
+                if tentativa == 3:
+                    raise
+                time.sleep(10 * tentativa)
+
         if resp.status_code == 404:
             _marcar_secao_indisponivel(secao)
             return []
