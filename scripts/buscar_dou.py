@@ -41,6 +41,15 @@ SECOES = ["DO1", "DO2", "DO3"]
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
+# ── Estado de degradação ──────────────────────────────────────────────────────
+# Quando o banco de dados não responde, o robô continua buscando usando a cópia
+# local (clientes.json), mas isso é uma EMERGÊNCIA, não o funcionamento normal:
+# os alertas não são gravados no histórico e o painel web não é atualizado.
+# Estas variáveis garantem que essa situação apareça no e-mail e faça o run
+# falhar (vermelho no GitHub), em vez de passar despercebida.
+MODO_DEGRADADO = False
+MOTIVO_DEGRADACAO = ""
+
 
 # ── Clientes: banco ou arquivo ────────────────────────────────────────────────
 
@@ -93,7 +102,18 @@ def _carregar_clientes() -> list[dict]:
             print(f"Carregados do banco: {len(clientes_rows)} clientes + {len(itens) - len(clientes_rows)} processos = {len(itens)} buscas")
             return itens
         except Exception as exc:
-            print(f"[AVISO] Falha ao conectar ao banco: {exc} — usando clientes.json")
+            global MODO_DEGRADADO, MOTIVO_DEGRADACAO
+            MODO_DEGRADADO = True
+            MOTIVO_DEGRADACAO = str(exc)
+            print("=" * 72)
+            print("[ERRO GRAVE] Não foi possível conectar ao banco de dados.")
+            print(f"  Motivo: {exc}")
+            print("  O robô vai continuar usando a cópia local (clientes.json),")
+            print("  mas ATENÇÃO: nesta condição os alertas NÃO são gravados no")
+            print("  histórico e o painel web NÃO é atualizado. A cópia local")
+            print("  também pode estar desatualizada em relação ao cadastro real.")
+            print("  Este run será marcado como FALHA para que o problema apareça.")
+            print("=" * 72)
 
     arquivo = Path(__file__).parent.parent / "clientes.json"
     clientes = json.loads(arquivo.read_text(encoding="utf-8"))
@@ -312,7 +332,8 @@ def enviar_email(alertas: list[dict]) -> bool:
     qtd = len(alertas)
     clientes_nomes = list({a["nome_cliente"] for a in alertas})
     resumo = ", ".join(clientes_nomes[:3]) + (" e outros" if len(clientes_nomes) > 3 else "")
-    assunto = f"[EMC Monitor] Alerta DOU {hoje} — {qtd} publicação{'ões' if qtd > 1 else ''}: {resumo}"
+    prefixo = "[!] " if MODO_DEGRADADO else ""
+    assunto = f"{prefixo}[EMC Monitor] Alerta DOU {hoje} — {qtd} publicação{'ões' if qtd > 1 else ''}: {resumo}"
 
     blocos_html = ""
     linhas_txt = [f"EMC Monitor — Alertas DOU {hoje}", f"Total: {qtd} publicação(ões)", "=" * 60]
@@ -367,9 +388,34 @@ def enviar_email(alertas: list[dict]) -> bool:
             linhas_txt.append(f"    Link: {a['url']}")
         linhas_txt.append("-" * 60)
 
+    # Aviso de emergência: banco fora do ar. Precisa ser impossível de ignorar.
+    if MODO_DEGRADADO:
+        banner_degradado = f"""
+        <div style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:18px 22px;margin-bottom:18px;">
+          <div style="font-size:15px;font-weight:700;color:#b91c1c;margin-bottom:8px;">
+            ⚠️ Atenção: o sistema está funcionando em modo de emergência
+          </div>
+          <div style="font-size:13px;color:#7f1d1d;line-height:1.65;">
+            O banco de dados não respondeu, então esta busca usou a <strong>cópia local
+            de segurança</strong> da lista de clientes.<br><br>
+            <strong>O que isso significa:</strong><br>
+            • Esta busca foi feita e os resultados abaixo são válidos.<br>
+            • Porém os alertas <strong>não foram gravados no histórico</strong>.<br>
+            • O painel no site <strong>não foi atualizado</strong>.<br>
+            • A lista usada pode estar desatualizada em relação ao seu cadastro.<br><br>
+            <strong>Providência:</strong> é preciso restabelecer o banco de dados.
+          </div>
+        </div>"""
+        linhas_txt.insert(0, "*** ATENCAO: MODO DE EMERGENCIA — banco de dados fora do ar. ***")
+        linhas_txt.insert(1, "Alertas nao gravados no historico; painel web nao atualizado.")
+        linhas_txt.insert(2, "=" * 60)
+    else:
+        banner_degradado = ""
+
     html = f"""<html>
     <body style="font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;margin:0;padding:24px 16px;">
       <div style="max-width:660px;margin:auto;">
+        {banner_degradado}
         <div style="background:#0f172a;border-radius:10px 10px 0 0;padding:0;">
           <div style="background:#16a34a;height:4px;border-radius:10px 10px 0 0;"></div>
           <div style="padding:22px 28px 20px;">
@@ -408,6 +454,78 @@ def enviar_email(alertas: list[dict]) -> bool:
         return True
     except Exception as exc:
         print(f"ERRO ao enviar e-mail: {exc}")
+        return False
+
+
+def enviar_aviso_falha() -> bool:
+    """
+    Envia aviso quando o banco está fora do ar e não houve publicações.
+    Sem isso, um dia sem publicações e um dia com o sistema quebrado
+    seriam indistinguíveis: nos dois casos não chegaria e-mail nenhum.
+    """
+    hoje = date.today().strftime("%d/%m/%Y")
+    assunto = f"[!] [EMC Monitor] Sistema em emergência — {hoje}"
+
+    texto = (
+        f"EMC Monitor — aviso de falha ({hoje})\n"
+        f"{'=' * 60}\n\n"
+        "A busca no DOU foi realizada, mas o BANCO DE DADOS NAO RESPONDEU.\n\n"
+        f"Motivo tecnico: {MOTIVO_DEGRADACAO}\n\n"
+        "Nenhuma publicacao foi encontrada hoje para os clientes monitorados.\n"
+        "Porem, como o banco esta fora do ar, a lista de clientes usada foi a\n"
+        "copia local de seguranca, que pode estar desatualizada.\n\n"
+        "E preciso restabelecer o banco de dados.\n"
+    )
+
+    html = f"""<html>
+    <body style="font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;margin:0;padding:24px 16px;">
+      <div style="max-width:660px;margin:auto;">
+        <div style="background:#0f172a;border-radius:10px 10px 0 0;">
+          <div style="background:#dc2626;height:4px;border-radius:10px 10px 0 0;"></div>
+          <div style="padding:22px 28px 20px;">
+            <div style="color:#fff;font-size:18px;font-weight:700;">📡 EMC Monitor</div>
+            <div style="color:rgba(255,255,255,.55);font-size:12px;margin-top:2px;">Aviso de falha do sistema</div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;padding:24px 28px;">
+          <div style="font-size:15px;font-weight:700;color:#b91c1c;margin-bottom:12px;">
+            ⚠️ O banco de dados não respondeu
+          </div>
+          <div style="font-size:13.5px;color:#374151;line-height:1.75;">
+            A busca no Diário Oficial foi feita normalmente em <strong>{hoje}</strong> e
+            <strong>nenhuma publicação</strong> foi encontrada para os clientes monitorados.<br><br>
+            Porém o banco de dados está fora do ar. Por isso a lista de clientes usada foi a
+            <strong>cópia local de segurança</strong>, que pode não refletir o cadastro atual.<br><br>
+            Você está recebendo este aviso para que um dia sem publicações não seja
+            confundido com um sistema quebrado.<br><br>
+            <strong>Providência:</strong> restabelecer o banco de dados.
+          </div>
+          <div style="background:#f8fafc;border-left:4px solid #dc2626;padding:12px 16px;border-radius:0 8px 8px 0;margin-top:18px;">
+            <div style="font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Detalhe técnico</div>
+            <div style="font-size:12px;color:#6b7280;font-family:monospace;word-break:break-all;">{MOTIVO_DEGRADACAO}</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:14px 0 24px;">
+          <div style="font-size:11px;color:#94a3b8;">Enviado automaticamente pelo EMC Monitor</div>
+        </div>
+      </div>
+    </body></html>"""
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = assunto
+        msg["From"] = EMAIL_REMETENTE
+        msg["To"] = ", ".join(EMAIL_DESTINATARIOS)
+        msg.attach(MIMEText(texto, "plain", "utf-8"))
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.login(EMAIL_REMETENTE, EMAIL_SENHA)
+            srv.sendmail(EMAIL_REMETENTE, EMAIL_DESTINATARIOS, msg.as_string())
+        return True
+    except Exception as exc:
+        print(f"ERRO ao enviar aviso de falha: {exc}")
         return False
 
 
@@ -456,13 +574,33 @@ if __name__ == "__main__":
     # Registra a busca no histórico
     _registrar_busca_log(
         total_encontrados=len(alertas),
-        sucesso=True,
-        observacao=f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
+        sucesso=not MODO_DEGRADADO,
+        observacao=(
+            f"MODO DE EMERGÊNCIA (banco fora do ar): {MOTIVO_DEGRADACAO}"
+            if MODO_DEGRADADO
+            else f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
+        ),
     )
 
+    email_ok = True
     if alertas:
         print("Enviando e-mail...")
-        ok = enviar_email(alertas)
-        print("E-mail:", "ENVIADO" if ok else "FALHOU")
+        email_ok = enviar_email(alertas)
+        print("E-mail:", "ENVIADO" if email_ok else "FALHOU")
+    elif MODO_DEGRADADO:
+        print("Nenhuma publicação hoje, mas o banco está fora do ar — enviando aviso.")
+        email_ok = enviar_aviso_falha()
+        print("E-mail de aviso:", "ENVIADO" if email_ok else "FALHOU")
     else:
         print("Nenhum cliente apareceu no DOU hoje — nenhum e-mail enviado.")
+
+    # O run precisa ficar VERMELHO no GitHub quando algo deu errado.
+    # Antes, uma falha de envio ou de banco terminava com código 0 (verde),
+    # dando a impressão de que estava tudo certo.
+    if MODO_DEGRADADO:
+        print("\n[FALHA] Run concluído em MODO DE EMERGÊNCIA — o banco de dados não respondeu.")
+        print("        Restabeleça o banco para voltar ao funcionamento normal.")
+        exit(1)
+    if not email_ok:
+        print("\n[FALHA] A busca funcionou, mas o e-mail não pôde ser enviado.")
+        exit(1)

@@ -3,23 +3,31 @@ name: Busca DOU — EMC Monitor
 on:
   schedule:
     # 6h00 horário de Brasília = 9h00 UTC (Brasil é UTC-3)
+    # Obs.: o GitHub não garante o horário exato — atrasos de 1h a 3h são normais
+    # em horários de pico. Por isso o cron roda um pouco antes do necessário.
     - cron: '0 9 * * 1-5'   # segunda a sexta
   workflow_dispatch:          # permite disparar manualmente pelo GitHub
+
+# Necessário para o passo de keep-alive conseguir fazer push.
+permissions:
+  contents: write
 
 jobs:
   buscar:
     runs-on: ubuntu-latest
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Instalar Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
       - name: Instalar dependências
-        run: pip install requests psycopg2-binary
+        # Versões fixas, iguais às do requirements.txt. Sem fixar, uma atualização
+        # de biblioteca pode quebrar o robô sem que nada tenha mudado no código.
+        run: pip install requests==2.32.3 psycopg2-binary==2.9.9
 
       - name: Executar busca no DOU e enviar e-mail
         run: python scripts/buscar_dou.py
@@ -30,3 +38,33 @@ jobs:
           EMAIL_SENHA:         ${{ secrets.EMAIL_SENHA }}
           EMAIL_DESTINATARIOS: ${{ secrets.EMAIL_DESTINATARIOS }}
           DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+
+      # ── Keep-alive ───────────────────────────────────────────────────────────
+      # O GitHub desativa automaticamente tarefas agendadas quando o repositório
+      # fica 60 dias sem nenhuma alteração. Foi exatamente isso que aconteceu em
+      # 25/05/2026 e deixou o monitoramento parado por mais de dois meses, sem
+      # nenhum aviso. Este passo registra atividade uma vez por mês para impedir
+      # que se repita.
+      #
+      # Roda com `always()` de propósito: se a busca falhar, o keep-alive ainda
+      # precisa acontecer — senão uma sequência de falhas desativaria o robô.
+      - name: Manter agendamento ativo
+        if: always() && github.event_name == 'schedule'
+        run: |
+          set -e
+          MES_ATUAL=$(date -u +%Y-%m)
+          ARQUIVO=.github/keepalive.txt
+          MES_ARQUIVO=$(head -c 7 "$ARQUIVO" 2>/dev/null || echo "")
+
+          if [ "$MES_ATUAL" = "$MES_ARQUIVO" ]; then
+            echo "Keep-alive já registrado neste mês ($MES_ATUAL). Nada a fazer."
+            exit 0
+          fi
+
+          echo "$MES_ATUAL — última atividade automática registrada em $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$ARQUIVO"
+          git config user.name  "EMC Monitor Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$ARQUIVO"
+          git commit -m "chore: mantem agendamento do robo ativo [skip ci]"
+          git push
+          echo "Keep-alive registrado para $MES_ATUAL — agendamento protegido por mais 60 dias."

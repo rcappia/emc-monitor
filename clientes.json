@@ -1,10 +1,517 @@
 [
-  {"nome_cliente": "Fundação Lumen", "termo_busca": "Fundação Lumen", "tipo": "nome"},
-  {"nome_cliente": "Fundação Nossa Senhora do Rocio", "termo_busca": "Fundação Nossa Senhora do Rocio", "tipo": "nome"},
-  {"nome_cliente": "Fundação Cultural Nossa Senhora de Lourdes de Maringá", "termo_busca": "Fundação Cultural Nossa Senhora de Lourdes de Maringá", "tipo": "nome"},
-  {"nome_cliente": "Fundação Cultural Nova Campo Largo", "termo_busca": "Fundação Cultural Nova Campo Largo", "tipo": "nome"},
-  {"nome_cliente": "Rádio Evangelizar Ltda", "termo_busca": "Rádio Evangelizar", "tipo": "nome"},
-  {"nome_cliente": "Rádio 880 Ltda", "termo_busca": "Rádio 880", "tipo": "nome"},
-  {"nome_cliente": "Rádio Universo Ltda", "termo_busca": "Rádio Universo", "tipo": "nome"},
-  {"nome_cliente": "Rádio Nova Registro Radiodifusão Ltda", "termo_busca": "Radio Nova Registro", "tipo": "nome"}
+  {
+    "nome_cliente": "Alpha Comunicações Ltda",
+    "termo_busca": "Alpha Comunicações Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Associação para o Desenvolvimento Cultural de Ouro Fino",
+    "termo_busca": "Associação para o Desenvolvimento Cultural de Ouro Fino",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "BRASIL EMISSORAS ALIADAS SOCIEDADE LTDA",
+    "termo_busca": "BRASIL EMISSORAS ALIADAS SOCIEDADE LTDA",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Camy Telecomunicações Ltda",
+    "termo_busca": "Camy Telecomunicações Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Cultura FM Radiodifusão Ltda",
+    "termo_busca": "Cultura FM Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Emissoras Interioranas Ltda",
+    "termo_busca": "Emissoras Interioranas Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Empresa de Radiodifusão Cultura Ltda",
+    "termo_busca": "Empresa de Radiodifusão Cultura Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Empresa de Rádio e Televisão Landell Ltda",
+    "termo_busca": "Empresa de Rádio e Televisão Landell Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Empresa de Rádio e Televisão Nosso Mundo Ltda",
+    "termo_busca": "Empresa de Rádio e Televisão Nosso Mundo Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Exclusiv Music Radiodifusão Ltda",
+    "termo_busca": "Exclusiv Music Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Cultural Nossa Senhora de Lourdes de Maringá",
+    "termo_busca": "Fundação Cultural Nossa Senhora de Lourdes de Maringá",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Cultural Nova Campo Largo",
+    "termo_busca": "Fundação Cultural Nova Campo Largo",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Educativa e Cultural Rio Verde",
+    "termo_busca": "Fundação Educativa e Cultural Rio Verde",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Espírita André Luiz",
+    "termo_busca": "Fundação Espírita André Luiz",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Gamaro",
+    "termo_busca": "Fundação Gamaro",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Lumen",
+    "termo_busca": "Fundação Lumen",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Nossa Senhora do Rocio",
+    "termo_busca": "Fundação Nossa Senhora do Rocio",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fundação Nova Campo Largo Rádio e Televisão Educativa",
+    "termo_busca": "Fundação Nova Campo Largo Rádio e Televisão Educativa",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Fênix Radiodifusão Ltda",
+    "termo_busca": "Fênix Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Galle - Sistema de Comunicação Ltda",
+    "termo_busca": "Galle - Sistema de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "HP Comunicação Ltda",
+    "termo_busca": "HP Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Ibirá Radiodifusão Ltda",
+    "termo_busca": "Ibirá Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "KBO Comunicações Lta.",
+    "termo_busca": "KBO Comunicações Lta.",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "KBO Comunicações Ltda",
+    "termo_busca": "KBO Comunicações Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Milton Neves Publicidade Ltda",
+    "termo_busca": "Milton Neves Publicidade Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Organização Radiodifusão de Cesário Lange Ltda",
+    "termo_busca": "Organização Radiodifusão de Cesário Lange Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Prefeitura Municipal de Santa Bárbara D\"Oeste",
+    "termo_busca": "Prefeitura Municipal de Santa Bárbara D\"Oeste",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "RECC Radiodifusão e Comunicação Ltda",
+    "termo_busca": "RECC Radiodifusão e Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Radio 900 Paty do Alferes ltda",
+    "termo_busca": "Radio 900 Paty do Alferes ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rede Associada de Difusão Ltda",
+    "termo_busca": "Rede Associada de Difusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rede Metropolitana de Rádio e Televisão Ltda",
+    "termo_busca": "Rede Metropolitana de Rádio e Televisão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rede Terra de Comunicação Ltda",
+    "termo_busca": "Rede Terra de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio 880 Ltda",
+    "termo_busca": "Rádio 880 Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio 99.5 FM Piracicaba Ltda",
+    "termo_busca": "Rádio 99.5 FM Piracicaba Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio A Voz de São Pedro Ltda",
+    "termo_busca": "Rádio A Voz de São Pedro Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio A Voz do Vale Ltda",
+    "termo_busca": "Rádio A Voz do Vale Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Assunção de Jales Sociedade Ltda",
+    "termo_busca": "Rádio Assunção de Jales Sociedade Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Auri Verde de Bauru Ltda",
+    "termo_busca": "Rádio Auri Verde de Bauru Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Azul Celeste Ltda",
+    "termo_busca": "Rádio Azul Celeste Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Brasil Novo Ltda",
+    "termo_busca": "Rádio Brasil Novo Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Capixaba Ltda",
+    "termo_busca": "Rádio Capixaba Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cidade Ternura Ltda",
+    "termo_busca": "Rádio Cidade Ternura Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cidade de Campinas Ltda",
+    "termo_busca": "Rádio Cidade de Campinas Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Clarim de Palmas Ltda",
+    "termo_busca": "Rádio Clarim de Palmas Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cruz de Malta Ltda",
+    "termo_busca": "Rádio Cruz de Malta Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cultura de Bragança Paulista Ltda",
+    "termo_busca": "Rádio Cultura de Bragança Paulista Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cultura de Maringá Ltda",
+    "termo_busca": "Rádio Cultura de Maringá Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Cultura de Monte Alto Ltda",
+    "termo_busca": "Rádio Cultura de Monte Alto Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Difusora Oeste Ltda",
+    "termo_busca": "Rádio Difusora Oeste Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Estrela de Ibiúna Ltda",
+    "termo_busca": "Rádio Estrela de Ibiúna Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Evangelizar Ltda",
+    "termo_busca": "Rádio Evangelizar Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Evangelizar é Preciso Ltda",
+    "termo_busca": "Rádio Evangelizar é Preciso Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio FM Cidade Mogi Guaçu Ltda",
+    "termo_busca": "Rádio FM Cidade Mogi Guaçu Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Franca do Imperador Ltda",
+    "termo_busca": "Rádio Franca do Imperador Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Hertz de Franca Ltda",
+    "termo_busca": "Rádio Hertz de Franca Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Independência Ltda",
+    "termo_busca": "Rádio Independência Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Independência de Cordeirópolis Ltda",
+    "termo_busca": "Rádio Independência de Cordeirópolis Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Itaí Ltda",
+    "termo_busca": "Rádio Itaí Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Itaí de Rio Claro Ltda",
+    "termo_busca": "Rádio Itaí de Rio Claro Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Jardim Ltda",
+    "termo_busca": "Rádio Jardim Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Jovem Pira Ltda",
+    "termo_busca": "Rádio Jovem Pira Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Laser Ltda",
+    "termo_busca": "Rádio Laser Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Musical FM do Vale ltda",
+    "termo_busca": "Rádio Musical FM do Vale ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Notícias de Tatuí Ltda",
+    "termo_busca": "Rádio Notícias de Tatuí Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Nova Cultura Ltda",
+    "termo_busca": "Rádio Nova Cultura Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Nova FM Lençóis Ltda",
+    "termo_busca": "Rádio Nova FM Lençóis Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Nova Jacupiranga ltda",
+    "termo_busca": "Rádio Nova Jacupiranga ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Nova Registro Radiodifusão Ltda",
+    "termo_busca": "Rádio Nova Registro Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Oito de Setembro Ltda",
+    "termo_busca": "Rádio Oito de Setembro Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Ondas Verdes de Catanduva Ltda",
+    "termo_busca": "Rádio Ondas Verdes de Catanduva Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Panamericana ltda",
+    "termo_busca": "Rádio Panamericana ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Santos Dumont Ltda",
+    "termo_busca": "Rádio Santos Dumont Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Sociedade de Ceres Ltda",
+    "termo_busca": "Rádio Sociedade de Ceres Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Stereo Planalto de Vinhedo Ltda",
+    "termo_busca": "Rádio Stereo Planalto de Vinhedo Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Transmissora de Serra Negra Ltda",
+    "termo_busca": "Rádio Transmissora de Serra Negra Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Técnica de Atibaia Ltda",
+    "termo_busca": "Rádio Técnica de Atibaia Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Universo Ltda",
+    "termo_busca": "Rádio Universo Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio União da Franca ltda",
+    "termo_busca": "Rádio União da Franca ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio Vida FM Ltda",
+    "termo_busca": "Rádio Vida FM Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Rádio e Televisão Gran-Dourados Ltda",
+    "termo_busca": "Rádio e Televisão Gran-Dourados Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema 90 de Comunicação Ltda",
+    "termo_busca": "Sistema 90 de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema 98 de Comunicação Ltda",
+    "termo_busca": "Sistema 98 de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Araujo de Comunicação Ltda",
+    "termo_busca": "Sistema Araujo de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Cristal de Comunicação ltda",
+    "termo_busca": "Sistema Cristal de Comunicação ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Excelsior de Comunicação Ltda",
+    "termo_busca": "Sistema Excelsior de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Meridional de Radiodifusão Ltda",
+    "termo_busca": "Sistema Meridional de Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Noroeste de Comunicação Ltda",
+    "termo_busca": "Sistema Noroeste de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Pinotti de Comunicação Ltda",
+    "termo_busca": "Sistema Pinotti de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Regional de Radiodifusão Ltda",
+    "termo_busca": "Sistema Regional de Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Terra de Radiodifusão Ltda",
+    "termo_busca": "Sistema Terra de Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sistema Vanguarda de Comunicação Ltda",
+    "termo_busca": "Sistema Vanguarda de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sociedade Aparecidense de Comunicação Ltda",
+    "termo_busca": "Sociedade Aparecidense de Comunicação Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sociedade Mineira de Radiodifusão Ltda",
+    "termo_busca": "Sociedade Mineira de Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sociedade Rádio Cacique de Capivari Ltda",
+    "termo_busca": "Sociedade Rádio Cacique de Capivari Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sociedade Rádio Clube de São José dos Campos Ltda",
+    "termo_busca": "Sociedade Rádio Clube de São José dos Campos Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Sociedade de Radiodifusão Capivari Ltda",
+    "termo_busca": "Sociedade de Radiodifusão Capivari Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Super Rádio de Curitiba Ltda",
+    "termo_busca": "Super Rádio de Curitiba Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Super Rádio de Londrina Ltda",
+    "termo_busca": "Super Rádio de Londrina Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "TMC - Radiodifusão Ltda",
+    "termo_busca": "TMC - Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Town Network Filmagens Ltda",
+    "termo_busca": "Town Network Filmagens Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Trans TV Radiodifusão Ltda",
+    "termo_busca": "Trans TV Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Tropical Radiodifusão Ltda",
+    "termo_busca": "Tropical Radiodifusão Ltda",
+    "tipo": "nome"
+  },
+  {
+    "nome_cliente": "Ômega Radiodifusão Ltda",
+    "termo_busca": "Ômega Radiodifusão Ltda",
+    "tipo": "nome"
+  }
 ]
