@@ -17,6 +17,7 @@ import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -63,10 +64,28 @@ MOTIVO_DEGRADACAO = ""
 # run e nunca chegava ao histórico do painel.
 ULTIMO_ERRO_EMAIL = ""
 
-# Conta falhas de leitura do DOU. Sem isso, o INLABS fora do ar produzia
-# exatamente o mesmo resultado de um dia sem publicações: zero alertas,
-# nenhum e-mail e run verde.
+# Duas situações diferentes que antes eram indistinguíveis de "dia tranquilo":
+#
+# SECOES_COM_FALHA  — não foi possível ACESSAR o DOU (rede fora, INLABS fora do
+#                     ar, erro HTTP). É problema de verdade: pode haver
+#                     publicação que passou batido. Dispara alarme.
+#
+# SECOES_INDISPONIVEIS — o DOU respondeu, mas aquela edição não existe (ainda
+#                     não publicada, feriado). É situação normal, não é falha.
+#                     Vira apenas informação, sem alarme falso.
 SECOES_COM_FALHA: list[str] = []
+SECOES_INDISPONIVEIS: list[str] = []
+
+
+def hoje_brasil() -> date:
+    """
+    Data de hoje no horário de Brasília.
+
+    Os servidores do GitHub rodam em UTC (3 horas à frente). No horário
+    normal da busca (6h da manhã) as duas datas coincidem, mas fora dele
+    o robô procurava o Diário do dia seguinte — que ainda não existe.
+    """
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).date()
 
 
 # ── Clientes: banco ou arquivo ────────────────────────────────────────────────
@@ -316,7 +335,7 @@ def _marcar_alertas_enviados():
 
 def _marcar_falha_secao(secao: str, motivo: str):
     """
-    Registra, uma única vez por seção, que ela não pôde ser lida.
+    Registra, uma única vez por seção, que ela não pôde ser ACESSADA.
 
     Como cada seção é baixada uma vez por cliente (103 vezes), sem essa
     deduplicação a mesma falha apareceria centenas de vezes no aviso.
@@ -325,8 +344,14 @@ def _marcar_falha_secao(secao: str, motivo: str):
         SECOES_COM_FALHA.append(f"{secao} ({motivo})")
 
 
+def _marcar_secao_indisponivel(secao: str):
+    """Registra que a edição do dia não existe para essa seção (situação normal)."""
+    if secao not in SECOES_INDISPONIVEIS:
+        SECOES_INDISPONIVEIS.append(secao)
+
+
 def buscar_hoje(session: requests.Session) -> list[dict]:
-    hoje = date.today().strftime("%Y-%m-%d")
+    hoje = hoje_brasil().strftime("%Y-%m-%d")
     cookie = session.cookies.get("inlabs_session_cookie", "")
     if not cookie:
         print("ERRO: falha no login INLABS")
@@ -348,13 +373,20 @@ def buscar_hoje(session: requests.Session) -> list[dict]:
                     headers={"Cookie": f"inlabs_session_cookie={cookie}", "origem": "736372697074"},
                     timeout=60,
                 )
+                if resp.status_code == 404:
+                    # Edição não publicada — normal em feriado ou madrugada.
+                    _marcar_secao_indisponivel(secao)
+                    continue
                 if resp.status_code != 200:
-                    # 404 é esperado: em feriado ou fim de semana a seção
-                    # simplesmente não é publicada. Qualquer outro código
-                    # indica problema de acesso ao DOU, e aí a busca do dia
-                    # não pode ser considerada completa.
-                    if resp.status_code != 404:
-                        _marcar_falha_secao(secao, f"HTTP {resp.status_code}")
+                    _marcar_falha_secao(secao, f"HTTP {resp.status_code}")
+                    continue
+
+                # O INLABS responde 200 com uma página HTML quando a edição
+                # ainda não saiu. Um ZIP de verdade sempre começa com "PK".
+                # Sem esta checagem, "Diário ainda não publicado" era tratado
+                # como "Diário quebrado" e gerava alarme falso.
+                if not resp.content.startswith(b"PK"):
+                    _marcar_secao_indisponivel(secao)
                     continue
                 with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
                     for nome_arq in zf.namelist():
@@ -393,7 +425,7 @@ def _formatar_paragrafo(texto: str) -> str:
 
 
 def enviar_email(alertas: list[dict]) -> bool:
-    hoje = date.today().strftime("%d/%m/%Y")
+    hoje = hoje_brasil().strftime("%d/%m/%Y")
     qtd = len(alertas)
     clientes_nomes = list({a["nome_cliente"] for a in alertas})
     resumo = ", ".join(clientes_nomes[:3]) + (" e outros" if len(clientes_nomes) > 3 else "")
@@ -532,7 +564,7 @@ def enviar_aviso_falha() -> bool:
     Sem isso, um dia sem publicações e um dia com o sistema quebrado
     seriam indistinguíveis: nos dois casos não chegaria e-mail nenhum.
     """
-    hoje = date.today().strftime("%d/%m/%Y")
+    hoje = hoje_brasil().strftime("%d/%m/%Y")
     assunto = f"[!] [EMC Monitor] Sistema em emergência — {hoje}"
 
     if MODO_DEGRADADO:
@@ -696,7 +728,7 @@ def autoteste() -> int:
         "termo_busca": "teste",
         "secao": "DO1",
         "titulo": "Mensagem de teste do EMC Monitor",
-        "data_publicacao": date.today().strftime("%d/%m/%Y"),
+        "data_publicacao": hoje_brasil().strftime("%d/%m/%Y"),
         "paragrafo": (
             "Esta e uma mensagem de teste enviada manualmente para verificar "
             "se o sistema de alertas esta funcionando. Nenhuma publicacao real "
@@ -733,7 +765,7 @@ if __name__ == "__main__":
     if "--autoteste" in sys.argv:
         sys.exit(autoteste())
 
-    hoje = date.today()
+    hoje = hoje_brasil()
     print(f"EMC Monitor — Busca DOU {hoje.strftime('%d/%m/%Y')}")
     print(f"Dia da semana: {hoje.strftime('%A')}")
     print(f"Banco de dados: {'Supabase' if DATABASE_URL else 'clientes.json (sem banco)'}")
@@ -751,9 +783,20 @@ if __name__ == "__main__":
 
     print(f"\nTotal encontrado: {len(alertas)} publicação(ões)")
 
+    if SECOES_INDISPONIVEIS:
+        print(f"[INFO] Edição do dia ainda não publicada para: "
+              f"{', '.join(SECOES_INDISPONIVEIS)} — situação normal em feriado "
+              f"ou fora do horário de publicação.")
     if SECOES_COM_FALHA:
         print(f"[ATENÇÃO] {len(SECOES_COM_FALHA)} seção(ões) do DOU não puderam "
               f"ser lidas: {', '.join(SECOES_COM_FALHA)}")
+
+    # Se NENHUMA seção existe, o Diário simplesmente não saiu hoje. Não é
+    # falha — mas também não dá para afirmar que não há publicações, então
+    # o dia é registrado como "não verificado".
+    dou_nao_publicado = (
+        len(SECOES_INDISPONIVEIS) == len(SECOES) and not SECOES_COM_FALHA
+    )
 
     # O envio vem ANTES do registro no histórico, de propósito.
     # Antes o log era gravado com sucesso=True antes de tentar enviar: se o
@@ -770,6 +813,8 @@ if __name__ == "__main__":
         print("Nenhuma publicação encontrada, mas houve falha no sistema — enviando aviso.")
         email_ok = enviar_aviso_falha()
         print("E-mail de aviso:", "ENVIADO" if email_ok else "FALHOU")
+    elif dou_nao_publicado:
+        print("O Diário Oficial de hoje não foi publicado — nada a verificar.")
     else:
         print("Nenhum cliente apareceu no DOU hoje — nenhum e-mail enviado.")
 
@@ -782,6 +827,8 @@ if __name__ == "__main__":
     elif SECOES_COM_FALHA:
         observacao = ("Busca incompleta — não foi possível ler: "
                       f"{', '.join(SECOES_COM_FALHA)}")
+    elif dou_nao_publicado:
+        observacao = "Diário Oficial não publicado hoje — nenhuma verificação possível."
     else:
         observacao = f"Busca concluída. {len(alertas)} publicação(ões) encontrada(s)."
 
