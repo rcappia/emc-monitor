@@ -2,10 +2,19 @@ name: Busca DOU — EMC Monitor
 
 on:
   schedule:
-    # 6h00 horário de Brasília = 9h00 UTC (Brasil é UTC-3)
-    # Obs.: o GitHub não garante o horário exato — atrasos de 1h a 3h são normais
-    # em horários de pico. Por isso o cron roda um pouco antes do necessário.
-    - cron: '0 9 * * 1-5'   # segunda a sexta
+    # Horários em UTC. Brasília é UTC-3, então subtraia 3 horas.
+    #
+    # São três tentativas por manhã, e não uma, para que o alerta saia assim
+    # que o Diário for publicado — sem depender de acertar o horário exato.
+    # Rodar mais de uma vez é seguro: o robô só envia por e-mail as
+    # publicações NOVAS (ver _salvar_alerta_db), então não há repetição.
+    #
+    # Os minutos são "quebrados" de propósito: o GitHub enfileira muitas
+    # tarefas na virada da hora, e agendar em :00 costuma render de 1h a 3h
+    # de atraso. Minutos fora do padrão pegam a fila bem mais curta.
+    - cron: '17 9  * * 1-5'   # 06h17 Brasília — DOU costuma sair por volta das 6h
+    - cron: '43 10 * * 1-5'   # 07h43 Brasília — pega publicação mais tardia
+    - cron: '23 13 * * 1-5'   # 10h23 Brasília — pega edições extras do dia
   workflow_dispatch:          # permite disparar manualmente pelo GitHub
     inputs:
       modo:

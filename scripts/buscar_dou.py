@@ -160,10 +160,20 @@ def _carregar_clientes() -> list[dict]:
     return clientes
 
 
-def _salvar_alerta_db(cliente_id: int, resultado: dict):
-    """Salva um alerta no Supabase vinculado ao cliente, evitando duplicatas."""
+def _salvar_alerta_db(cliente_id: int, resultado: dict) -> bool:
+    """
+    Salva um alerta no Supabase vinculado ao cliente, evitando duplicatas.
+
+    Retorna True se o alerta é NOVO (foi gravado agora), False se já existia.
+
+    Esse retorno é o que permite o robô rodar várias vezes por dia sem
+    reenviar o mesmo alerta: só entram no e-mail os que voltaram True.
+    Sem isso, três execuções matinais mandariam três e-mails idênticos.
+    """
     if not DATABASE_URL or cliente_id is None:
-        return
+        # Sem banco não há como saber o que já foi enviado. Trata como novo
+        # para não perder alerta — é o comportamento seguro na emergência.
+        return True
     try:
         import psycopg2
         conn = psycopg2.connect(DATABASE_URL)
@@ -172,7 +182,8 @@ def _salvar_alerta_db(cliente_id: int, resultado: dict):
             "SELECT id FROM alertas_dou WHERE cliente_id = %s AND data_publicacao = %s AND titulo = %s",
             (cliente_id, resultado["data_publicacao"], resultado["titulo"][:500]),
         )
-        if not cur.fetchone():
+        ja_existe = cur.fetchone() is not None
+        if not ja_existe:
             cur.execute(
                 # email_enviado entra como FALSE: o alerta acabou de ser
                 # encontrado e o e-mail ainda nem foi tentado. Só vira TRUE
@@ -198,8 +209,11 @@ def _salvar_alerta_db(cliente_id: int, resultado: dict):
             conn.commit()
         cur.close()
         conn.close()
+        return not ja_existe
     except Exception as exc:
         print(f"[AVISO] Erro ao salvar alerta no banco: {exc}")
+        # Na dúvida, trata como novo: perder um alerta é pior que repetir um.
+        return True
 
 
 CLIENTES = _carregar_clientes()
@@ -350,62 +364,102 @@ def _marcar_secao_indisponivel(secao: str):
         SECOES_INDISPONIVEIS.append(secao)
 
 
+def _baixar_secao(session: requests.Session, cookie: str, dia: str, secao: str) -> list[bytes]:
+    """
+    Baixa uma seção do DOU e devolve o conteúdo dos XMLs de dentro do ZIP.
+
+    Devolve lista vazia quando a edição não existe (feriado, ainda não
+    publicada) ou quando houve falha de acesso — as duas situações ficam
+    registradas em listas separadas, porque só a segunda é problema.
+    """
+    url = f"{URL_BASE}{dia}&dl={dia}-{secao}.zip"
+    try:
+        resp = session.get(
+            url,
+            headers={"Cookie": f"inlabs_session_cookie={cookie}", "origem": "736372697074"},
+            timeout=60,
+        )
+        if resp.status_code == 404:
+            _marcar_secao_indisponivel(secao)
+            return []
+        if resp.status_code != 200:
+            _marcar_falha_secao(secao, f"HTTP {resp.status_code}")
+            return []
+
+        # O INLABS responde 200 com uma página HTML quando a edição ainda não
+        # saiu. Um ZIP de verdade sempre começa com "PK".
+        if not resp.content.startswith(b"PK"):
+            _marcar_secao_indisponivel(secao)
+            return []
+
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            return [
+                zf.read(nome) for nome in zf.namelist() if nome.endswith(".xml")
+            ]
+    except Exception as exc:
+        print(f"  [AVISO] Erro ao baixar {secao}: {exc}")
+        _marcar_falha_secao(secao, type(exc).__name__)
+        return []
+
+
 def buscar_hoje(session: requests.Session) -> list[dict]:
+    """
+    Baixa o DOU do dia UMA vez por seção e procura todos os clientes nele.
+
+    Antes o download acontecia dentro do laço de clientes: as mesmas 3 seções
+    eram baixadas e descompactadas uma vez para CADA cliente — 103 × 3 = 309
+    downloads do Diário inteiro por execução. Era a causa dos 20-28 minutos
+    de duração e um convite a bloqueio por excesso de requisições.
+
+    Com o download fora do laço são 3 downloads, e a busca dos 103 clientes
+    acontece em memória.
+    """
     hoje = hoje_brasil().strftime("%Y-%m-%d")
     cookie = session.cookies.get("inlabs_session_cookie", "")
     if not cookie:
         print("ERRO: falha no login INLABS")
         return []
 
+    # 1) Baixa cada seção uma única vez.
+    print("Baixando as seções do DOU...")
+    xmls_por_secao: dict[str, list[bytes]] = {}
+    for secao in SECOES:
+        arquivos = _baixar_secao(session, cookie, hoje, secao)
+        if arquivos:
+            xmls_por_secao[secao] = arquivos
+            print(f"  {secao}: {len(arquivos)} arquivo(s)")
+        else:
+            print(f"  {secao}: indisponível")
+
+    if not xmls_por_secao:
+        return []
+
+    # 2) Procura cada cliente no conteúdo já baixado.
+    print(f"\nProcurando {len(CLIENTES)} clientes no conteúdo baixado...")
     todos = []
     for cliente in CLIENTES:
         nome = cliente["nome_cliente"]
         termo = cliente["termo_busca"]
         tipo = cliente["tipo"]
         cliente_id = cliente.get("id")
-        print(f"  Buscando: {nome}...", end=" ", flush=True)
         encontrados = []
-        for secao in SECOES:  # noqa: PLR1702
-            url = f"{URL_BASE}{hoje}&dl={hoje}-{secao}.zip"
-            try:
-                resp = session.get(
-                    url,
-                    headers={"Cookie": f"inlabs_session_cookie={cookie}", "origem": "736372697074"},
-                    timeout=60,
-                )
-                if resp.status_code == 404:
-                    # Edição não publicada — normal em feriado ou madrugada.
-                    _marcar_secao_indisponivel(secao)
-                    continue
-                if resp.status_code != 200:
-                    _marcar_falha_secao(secao, f"HTTP {resp.status_code}")
-                    continue
 
-                # O INLABS responde 200 com uma página HTML quando a edição
-                # ainda não saiu. Um ZIP de verdade sempre começa com "PK".
-                # Sem esta checagem, "Diário ainda não publicado" era tratado
-                # como "Diário quebrado" e gerava alarme falso.
-                if not resp.content.startswith(b"PK"):
-                    _marcar_secao_indisponivel(secao)
-                    continue
-                with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
-                    for nome_arq in zf.namelist():
-                        if not nome_arq.endswith(".xml"):
-                            continue
-                        with zf.open(nome_arq) as f:
-                            itens = buscar_em_xml(f.read(), termo, secao)
-                        for item in itens:
-                            item["nome_cliente"] = nome
-                            item["tipo"] = tipo
-                            item["termo_busca"] = termo
-                            encontrados.append(item)
-                            # Salva no banco de dados (Supabase)
-                            _salvar_alerta_db(cliente_id, item)
-            except Exception as exc:
-                print(f"\n  [AVISO] Erro em {secao}: {exc}")
-                _marcar_falha_secao(secao, type(exc).__name__)
-        print(f"{len(encontrados)} resultado(s)")
+        for secao, arquivos in xmls_por_secao.items():
+            for conteudo in arquivos:
+                for item in buscar_em_xml(conteudo, termo, secao):
+                    item["nome_cliente"] = nome
+                    item["tipo"] = tipo
+                    item["termo_busca"] = termo
+                    # Só entra no e-mail se for alerta novo. É isso que permite
+                    # rodar várias vezes de manhã, para pegar o DOU assim que
+                    # sai, sem repetir o mesmo aviso.
+                    if _salvar_alerta_db(cliente_id, item):
+                        encontrados.append(item)
+
+        if encontrados:
+            print(f"  {nome}: {len(encontrados)} publicação(ões) NOVA(S)")
         todos.extend(encontrados)
+
     return todos
 
 
