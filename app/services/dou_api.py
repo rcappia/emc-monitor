@@ -10,8 +10,18 @@ import xml.etree.ElementTree as ET
 import requests
 from datetime import date, timedelta
 
-INLABS_EMAIL = "rcappia@gmail.com"
-INLABS_SENHA = "emc@2026"
+import os
+
+# Credenciais do INLABS (assinatura do Diário Oficial).
+#
+# Antes estavam escritas aqui em texto puro, num repositório PÚBLICO — ou seja,
+# expostas a qualquer pessoa desde março/2026. Agora vêm de variável de
+# ambiente, como o robô do GitHub Actions já fazia corretamente.
+#
+# ATENÇÃO: apagar daqui não basta. A senha antiga continua recuperável no
+# histórico do Git e precisa ser TROCADA no site do INLABS.
+INLABS_EMAIL = os.environ.get("INLABS_EMAIL", "")
+INLABS_SENHA = os.environ.get("INLABS_SENHA", "")
 URL_LOGIN = "https://inlabs.in.gov.br/logar.php"
 URL_BASE = "https://inlabs.in.gov.br/index.php?p="
 
